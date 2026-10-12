@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const steps = [
   { number: "01", title: "Задайте направление", text: "Тема, жанр, язык и стиль — отправная точка вашего будущего видео." },
   { number: "02", title: "Соберите историю", text: "Создавайте сценарий, редактируйте текст и возвращайтесь к сохранённым версиям." },
@@ -9,13 +11,13 @@ export default function Home() {
     <>
       <a className="skip-link" href="#main">Перейти к содержимому</a>
       <header className="header container">
-        <a className="brand" href="/" aria-label="ScenePilot — главная">
+        <Link className="brand" href="/" aria-label="ScenePilot — главная">
           <span className="brand-mark" aria-hidden="true">S<span>▸</span></span>
           ScenePilot
-        </a>
+        </Link>
         <nav aria-label="Основная навигация">
           <a href="#workflow">Как это работает</a>
-          <a href="#workspace">Рабочее пространство <span aria-hidden="true">↗</span></a>
+          <Link href="/projects">Мои проекты <span aria-hidden="true">↗</span></Link>
         </nav>
       </header>
 
@@ -40,12 +42,12 @@ export default function Home() {
           <ol className="steps">
             {steps.map((step) => <li key={step.number}><span className="step-number" aria-hidden="true">{step.number}</span><h3>{step.title}</h3><p>{step.text}</p></li>)}
           </ol>
-          <p className="workflow-note">Так будет устроена работа в ScenePilot. Сейчас доступна стартовая страница.</p>
+          <p className="workflow-note">Так будет устроена работа в ScenePilot. Редактор сценариев и сцен пока в разработке.</p>
         </section>
 
         <section id="workspace" className="workspace" aria-labelledby="workspace-title">
-          <div><p className="eyebrow">В РАЗРАБОТКЕ</p><h2 id="workspace-title">Здесь появятся ваши проекты</h2><p>Создание проектов, вход и генерация пока недоступны.<br />Мы готовим пространство для вашей первой истории.</p></div>
-          <span className="workspace-symbol" aria-hidden="true">↗</span>
+          <div><p className="eyebrow">В РАЗРАБОТКЕ</p><h2 id="workspace-title">Здесь появятся ваши проекты</h2><p>Начните со входа в своё рабочее пространство.<br />Создание проектов и генерация появятся на следующих шагах.</p></div>
+          <Link className="button" href="/login">Войти <span aria-hidden="true">↗</span></Link>
         </section>
       </main>
       <footer className="footer container"><span>ScenePilot</span><span>От идеи к сценам.</span></footer>
