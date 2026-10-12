@@ -1,0 +1,2100 @@
+Directory structure:
+└── po1nt204-watch-wise/
+    ├── README.md
+    ├── components.json
+    ├── docker-compose.yml
+    ├── eslint.config.mjs
+    ├── next.config.ts
+    ├── package.json
+    ├── postcss.config.mjs
+    ├── tsconfig.json
+    ├── vitest.config.ts
+    ├── vitest.setup.ts
+    ├── prisma/
+    │   ├── schema.prisma
+    │   └── migrations/
+    │       ├── migration_lock.toml
+    │       ├── 20251201093526_init_schema/
+    │       │   └── migration.sql
+    │       ├── 20260205150145_add_transcript_chunks/
+    │       │   └── migration.sql
+    │       ├── 20260211144131_add_profile_fields/
+    │       │   └── migration.sql
+    │       ├── 20260331120549_add_cloud_url/
+    │       │   └── migration.sql
+    │       ├── 20260410121932_add_tags_model/
+    │       │   └── migration.sql
+    │       ├── 20260414080010_add_llm_telemetry/
+    │       │   └── migration.sql
+    │       ├── 20260417095659_add_audience_and_focus/
+    │       │   └── migration.sql
+    │       ├── 20260420130027_add_gamification/
+    │       │   └── migration.sql
+    │       ├── 20260506114629_add_xp_logs/
+    │       │   └── migration.sql
+    │       └── 20260601103749_add_ai_feedback/
+    │           └── migration.sql
+    └── src/
+        ├── middleware.ts
+        ├── app/
+        │   ├── dashboard/...
+        │   ├── login/...
+        │   └── register/...
+        ├── components/
+        │   ├── features/...
+        │   ├── layout/...
+        │   └── ui/...
+        ├── config/...
+        ├── constants/
+        │   └── app.ts
+        ├── hooks/...
+        ├── lib/...
+        ├── server-actions/...
+        ├── services/
+        │   ├── analysis-orchestrator.ts
+        │   ├── analytics.ts
+        │   ├── s3.ts
+        │   ├── speechkit.ts
+        │   ├── video-downloader.ts
+        │   ├── video.ts
+        │   ├── yandex.ts
+        │   ├── youtube.ts
+        ├── shared/...
+        └── store/...
+
+================================================
+FILE: README.md
+================================================
+# WatchWise — Interactive AI Video Learning Platform
+
+![Project Status](https://img.shields.io/badge/Status-MVP_Ready-green)
+![Refactoring](https://img.shields.io/badge/Stage-Refactoring-orange)
+![License](https://img.shields.io/badge/License-MIT-blue)
+
+**WatchWise** — это веб-платформа, которая трансформирует пассивный просмотр образовательных видео (YouTube, VK Video) в активный процесс обучения. Система использует технологии искусственного интеллекта (Yandex Cloud) для автоматической генерации конспектов, тестов и флеш-карточек, а также реализует уникальную механику «Умной паузы».
+
+> Проект разрабатывается в рамках Выпускной Квалификационной Работы (ВКР).
+
+## 🌟 Основные возможности
+
+- **Мультиплатформенность:** Поддержка видео с YouTube и VK Video.
+- **AI-Генерация контента:** Конспекты, тесты, флеш-карточки и автоматическое тегирование.
+- **Умная пауза (Smart Pause):** Видеоплеер автоматически останавливается в ключевые моменты, предлагая ответить на вопрос по пройденному материалу.
+- **Личный кабинет & Геймификация:** Отслеживание прогресса, накопление XP, уровни и история просмотров.
+- **Редактор преподавателя:** Возможность корректировать сгенерированные тесты.
+
+## 🛠 Технологический стек
+
+- **Core:** [Next.js 15](https://nextjs.org/) (App Router), TypeScript.
+- **Frontend:** Tailwind CSS, shadcn/ui, Zustand.
+- **Backend & DB:** Server Actions, PostgreSQL, Prisma ORM.
+- **AI & Media Pipeline:** YandexGPT, Yandex SpeechKit, Yandex Object Storage (S3), `ytdlp-nodejs`.
+- **Reliability:** Zod (Validation), Pino (Logging), p-retry (Resilience).
+
+## 🚀 Запуск проекта локально
+
+Для запуска понадобятся **Node.js** (v18+) и **Docker**.
+
+1.  **Клонируйте репозиторий:**
+
+    ```bash
+    git clone [https://github.com/your-username/watch-wise.git](https://github.com/your-username/watch-wise.git)
+    cd watch-wise
+    ```
+
+2.  **Установите зависимости:**
+
+    ```bash
+    npm install
+    ```
+
+3.  **Настройте переменные окружения (.env):**
+    Создайте файл `.env` в корне проекта. Вам понадобятся следующие ключи:
+
+    ```env
+    # Database
+    DATABASE_URL="postgresql://user:password@localhost:5432/watchwise?schema=public"
+
+    # Next Auth
+    AUTH_SECRET="your-super-secret-key"
+    AUTH_GOOGLE_ID="your-google-oauth-id"
+    AUTH_GOOGLE_SECRET="your-google-oauth-secret"
+
+    # Yandex Cloud (AI & S3)
+    YANDEX_API_KEY="your-yandex-api-key"
+    YANDEX_FOLDER_ID="your-yandex-folder-id"
+    YANDEX_STORAGE_ACCESS_KEY="your-s3-access-key"
+    YANDEX_STORAGE_SECRET_KEY="your-s3-secret-key"
+    YANDEX_STORAGE_BUCKET_NAME="your-bucket-name"
+    ```
+
+4.  **Запустите базу данных (через Docker):**
+
+    ```bash
+    docker compose up -d
+    ```
+
+5.  **Выполните миграции БД:**
+
+    ```bash
+    npx prisma migrate dev
+    ```
+
+6.  **Запустите проект:**
+    `bash
+    npm run dev
+    `
+    Откройте [http://localhost:3000](http://localhost:3000) в браузере.
+
+## 📂 Документация
+
+Подробная техническая документация находится в папке `docs/`:
+
+- `architecture.md` — архитектурные правила и структура.
+- `plan.md` — план разработки и решения проблем.
+- `requirements.md` — функциональные требования.
+
+
+================================================
+FILE: components.json
+================================================
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/app/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "registries": {}
+}
+
+
+
+================================================
+FILE: docker-compose.yml
+================================================
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: watch-wise-db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: watchwise
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+
+volumes:
+  postgres_data:
+
+
+
+================================================
+FILE: eslint.config.mjs
+================================================
+import { dirname } from "path";
+import { fileURLToPath } from "url";
+import { FlatCompat } from "@eslint/eslintrc";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const compat = new FlatCompat({
+  baseDirectory: __dirname,
+});
+
+const eslintConfig = [
+  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  {
+    ignores: [
+      "node_modules/**",
+      ".next/**",
+      "out/**",
+      "build/**",
+      "next-env.d.ts",
+    ],
+  },
+];
+
+export default eslintConfig;
+
+
+
+================================================
+FILE: next.config.ts
+================================================
+import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'avatars.githubusercontent.com',
+      },
+    ],
+  },
+};
+
+export default nextConfig;
+
+
+
+================================================
+FILE: package.json
+================================================
+{
+  "name": "watch-wise",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack | pino-pretty",
+    "build": "next build --turbopack",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "vitest",
+    "test:ui": "vitest --ui"
+  },
+  "dependencies": {
+    "@auth/prisma-adapter": "^2.11.1",
+    "@aws-sdk/client-s3": "^3.1014.0",
+    "@hookform/resolvers": "^5.2.2",
+    "@prisma/client": "^6.4.1",
+    "@radix-ui/react-avatar": "^1.1.11",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-label": "^2.1.8",
+    "@radix-ui/react-scroll-area": "^1.2.10",
+    "@radix-ui/react-separator": "^1.1.8",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "axios": "^1.13.6",
+    "bcryptjs": "^3.0.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "dotenv": "^17.2.3",
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^0.555.0",
+    "next": "^15.5.7",
+    "next-auth": "^5.0.0-beta.30",
+    "next-themes": "^0.4.6",
+    "openai": "^6.32.0",
+    "p-retry": "^7.1.1",
+    "pino": "^10.3.1",
+    "prisma": "^6.4.1",
+    "radix-ui": "^1.4.3",
+    "react": "19.1.0",
+    "react-confetti": "^6.4.0",
+    "react-dom": "19.1.0",
+    "react-hook-form": "^7.68.0",
+    "react-markdown": "^10.1.0",
+    "react-use": "^17.6.0",
+    "recharts": "^3.8.1",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.4.0",
+    "youtube-transcript": "^1.3.0",
+    "ytdlp-nodejs": "^3.4.4",
+    "zod": "^4.1.13",
+    "zustand": "^5.0.9"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20",
+    "@types/pg": "^8.15.6",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.1",
+    "@vitest/ui": "^4.1.5",
+    "eslint": "^9",
+    "eslint-config-next": "^15.5.7",
+    "jsdom": "^29.1.0",
+    "pino-pretty": "^13.1.3",
+    "tailwindcss": "^4",
+    "tw-animate-css": "^1.4.0",
+    "typescript": "^5",
+    "vitest": "^4.1.5"
+  }
+}
+
+
+
+================================================
+FILE: postcss.config.mjs
+================================================
+const config = {
+  plugins: ["@tailwindcss/postcss"],
+};
+
+export default config;
+
+
+
+================================================
+FILE: tsconfig.json
+================================================
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}
+
+
+
+================================================
+FILE: vitest.config.ts
+================================================
+import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./vitest.setup.ts'],
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+    pool: 'threads',
+  },
+});
+
+
+
+================================================
+FILE: vitest.setup.ts
+================================================
+import '@testing-library/jest-dom';
+
+
+================================================
+FILE: prisma/schema.prisma
+================================================
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- NextAuth Models (Обязательно для OAuth) ---
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String? @db.Text
+  access_token       String? @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String? @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model XpLog {
+  id        String   @id @default(cuid())
+  userId    String
+  amount    Int
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?   // Для Credentials провайдера
+  role          String    @default("user") // 'user' | 'admin'
+  
+  bio           String?   @db.Text
+  age           Int?
+  links         Json?     // Храним массив ссылок или объект { github: "", website: "" }
+  location      String? 
+
+  xp            Int       @default(0)       // Текущий опыт
+  level         Int       @default(1)       // Текущий уровень
+  streak        Int       @default(0)       // Дней обучения подряд
+  lastActiveAt  DateTime?                   // Дата последней активности (для стриков)
+
+  tags          Tag[]
+
+  accounts      Account[]
+  sessions      Session[]
+  
+  // Связи приложения
+  generations   GeneratedContent[]
+  testResults   TestResult[]
+  progress      VideoProgress[] // История просмотров
+  xpLogs XpLog[]
+  aiFeedbacks   AiFeedback[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum VideoStatus {
+  PENDING     // В очереди
+  PROCESSING  // Скачиваем/Транскрибируем
+  COMPLETED   // Готово
+  FAILED      // Ошибка (видео удалено или API упал)
+}
+
+// --- Видео (Кэш) ---
+model Video {
+  id          String   @id @default(cuid())
+  url         String   @unique
+  platform    String   // 'youtube' | 'vk'
+  status      VideoStatus @default(PENDING)
+  externalId  String?
+  title       String?
+  thumbnail   String?
+  duration    Int?
+  cloudUrl    String?
+  
+  // Транскрипт хранится как JSONB (оптимизировано в Postgres)
+  transcript  Json?    
+  
+  createdAt   DateTime @default(now())
+  
+  transcriptChunks  TranscriptChunk[]
+  generatedContents GeneratedContent[]
+  progress          VideoProgress[]
+}
+
+// --- Прогресс просмотра ---
+model VideoProgress {
+  id        String   @id @default(cuid())
+  userId    String
+  videoId   String
+  timestamp Int      // На какой секунде остановился
+  isCompleted Boolean @default(false)
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  tags        Tag[]
+
+  @@unique([userId, videoId])
+}
+
+// --- Теги пользователя ---
+model Tag {
+  id        String   @id @default(cuid())
+  name      String
+  color     String?  // Опционально: цвет тега (например, HEX '#ff0000')
+  userId    String
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Неявная связь многие-ко-многим с прогрессом (конкретным видео юзера)
+  videoProgresses VideoProgress[]
+
+  @@unique([userId, name]) // У одного юзера не может быть двух тегов с одинаковым именем
+}
+
+// --- Сгенерированный Контент ---
+model GeneratedContent {
+  id          String   @id @default(cuid())
+  difficulty  String   // 'easy', 'medium', 'hard'
+  mode        String   // 'student', 'teacher'
+  audience    String   @default("student") // 'schoolboy', 'student', 'expert'
+  focus       String   @default("theory")  // 'theory', 'practice', 'facts'
+  summary     String   @db.Text
+  
+  // --- Телеметрия LLM ---
+  latencyMs   Int?     // Время ответа API в миллисекундах
+  tokensUsed  Int?     // Израсходованные токены
+  
+  createdAt   DateTime @default(now())
+  
+  userId      String
+  videoId     String
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video       Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  
+  flashcards  Flashcard[]
+  questions   QuizQuestion[]
+  testResults TestResult[]
+  feedbacks   AiFeedback[]
+
+  @@index([videoId, userId]) // Для быстрого получения контента юзера по видео
+}
+
+model Flashcard {
+  id          String   @id @default(cuid())
+  term        String
+  definition  String   @db.Text
+  
+  contentId   String
+  content     GeneratedContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+}
+
+model QuizQuestion {
+  id          String   @id @default(cuid())
+  text        String   @db.Text
+  timestamp   Float     
+  options     Json     
+  correctIdx  Int      
+  explanation String?  @db.Text
+  
+  contentId   String
+  content     GeneratedContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([contentId])
+}
+
+model TestResult {
+  id          String   @id @default(cuid())
+  score       Int      
+  total       Int      
+  completedAt DateTime @default(now())
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  contentId   String
+  content     GeneratedContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+}
+
+model TranscriptChunk {
+  id        String   @id @default(cuid())
+  videoId   String
+  startTime Float    // Время в секундах (с точностью до мс)
+  endTime   Float
+  text      String   @db.Text
+
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([videoId]) // Индекс для быстрого поиска субтитров к видео
+}
+
+model AiFeedback {
+  id               String           @id @default(cuid())
+  isLiked          Boolean          
+  comment          String?          @db.Text
+  createdAt        DateTime         @default(now())
+  
+  userId           String
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  generatedContentId String
+  generatedContent   GeneratedContent @relation(fields: [generatedContentId], references: [id], onDelete: Cascade)
+
+  @@index([generatedContentId])
+}
+
+
+================================================
+FILE: prisma/migrations/migration_lock.toml
+================================================
+# Please do not edit this file manually
+# It should be added in your version-control system (e.g., Git)
+provider = "postgresql"
+
+
+================================================
+FILE: prisma/migrations/20251201093526_init_schema/migration.sql
+================================================
+-- CreateTable
+CREATE TABLE "Account" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "provider" TEXT NOT NULL,
+    "providerAccountId" TEXT NOT NULL,
+    "refresh_token" TEXT,
+    "access_token" TEXT,
+    "expires_at" INTEGER,
+    "token_type" TEXT,
+    "scope" TEXT,
+    "id_token" TEXT,
+    "session_state" TEXT,
+
+    CONSTRAINT "Account_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Session" (
+    "id" TEXT NOT NULL,
+    "sessionToken" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "expires" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Session_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "User" (
+    "id" TEXT NOT NULL,
+    "name" TEXT,
+    "email" TEXT,
+    "emailVerified" TIMESTAMP(3),
+    "image" TEXT,
+    "password" TEXT,
+    "role" TEXT NOT NULL DEFAULT 'user',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "User_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "VerificationToken" (
+    "identifier" TEXT NOT NULL,
+    "token" TEXT NOT NULL,
+    "expires" TIMESTAMP(3) NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "Video" (
+    "id" TEXT NOT NULL,
+    "url" TEXT NOT NULL,
+    "platform" TEXT NOT NULL,
+    "externalId" TEXT,
+    "title" TEXT,
+    "thumbnail" TEXT,
+    "duration" INTEGER,
+    "transcript" JSONB,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Video_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "VideoProgress" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "videoId" TEXT NOT NULL,
+    "timestamp" INTEGER NOT NULL,
+    "isCompleted" BOOLEAN NOT NULL DEFAULT false,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "VideoProgress_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "GeneratedContent" (
+    "id" TEXT NOT NULL,
+    "difficulty" TEXT NOT NULL,
+    "mode" TEXT NOT NULL,
+    "summary" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "userId" TEXT NOT NULL,
+    "videoId" TEXT NOT NULL,
+
+    CONSTRAINT "GeneratedContent_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Flashcard" (
+    "id" TEXT NOT NULL,
+    "term" TEXT NOT NULL,
+    "definition" TEXT NOT NULL,
+    "contentId" TEXT NOT NULL,
+
+    CONSTRAINT "Flashcard_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "QuizQuestion" (
+    "id" TEXT NOT NULL,
+    "text" TEXT NOT NULL,
+    "timestamp" INTEGER NOT NULL,
+    "options" JSONB NOT NULL,
+    "correctIdx" INTEGER NOT NULL,
+    "explanation" TEXT,
+    "contentId" TEXT NOT NULL,
+
+    CONSTRAINT "QuizQuestion_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TestResult" (
+    "id" TEXT NOT NULL,
+    "score" INTEGER NOT NULL,
+    "total" INTEGER NOT NULL,
+    "completedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "userId" TEXT NOT NULL,
+    "contentId" TEXT NOT NULL,
+
+    CONSTRAINT "TestResult_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Account_provider_providerAccountId_key" ON "Account"("provider", "providerAccountId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Session_sessionToken_key" ON "Session"("sessionToken");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "VerificationToken_token_key" ON "VerificationToken"("token");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "VerificationToken_identifier_token_key" ON "VerificationToken"("identifier", "token");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Video_url_key" ON "Video"("url");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "VideoProgress_userId_videoId_key" ON "VideoProgress"("userId", "videoId");
+
+-- AddForeignKey
+ALTER TABLE "Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Session" ADD CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VideoProgress" ADD CONSTRAINT "VideoProgress_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VideoProgress" ADD CONSTRAINT "VideoProgress_videoId_fkey" FOREIGN KEY ("videoId") REFERENCES "Video"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "GeneratedContent" ADD CONSTRAINT "GeneratedContent_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "GeneratedContent" ADD CONSTRAINT "GeneratedContent_videoId_fkey" FOREIGN KEY ("videoId") REFERENCES "Video"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Flashcard" ADD CONSTRAINT "Flashcard_contentId_fkey" FOREIGN KEY ("contentId") REFERENCES "GeneratedContent"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "QuizQuestion" ADD CONSTRAINT "QuizQuestion_contentId_fkey" FOREIGN KEY ("contentId") REFERENCES "GeneratedContent"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TestResult" ADD CONSTRAINT "TestResult_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TestResult" ADD CONSTRAINT "TestResult_contentId_fkey" FOREIGN KEY ("contentId") REFERENCES "GeneratedContent"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+
+
+================================================
+FILE: prisma/migrations/20260205150145_add_transcript_chunks/migration.sql
+================================================
+-- CreateEnum
+CREATE TYPE "VideoStatus" AS ENUM ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED');
+
+-- AlterTable
+ALTER TABLE "QuizQuestion" ALTER COLUMN "timestamp" SET DATA TYPE DOUBLE PRECISION;
+
+-- AlterTable
+ALTER TABLE "Video" ADD COLUMN     "status" "VideoStatus" NOT NULL DEFAULT 'PENDING';
+
+-- CreateTable
+CREATE TABLE "TranscriptChunk" (
+    "id" TEXT NOT NULL,
+    "videoId" TEXT NOT NULL,
+    "startTime" DOUBLE PRECISION NOT NULL,
+    "endTime" DOUBLE PRECISION NOT NULL,
+    "text" TEXT NOT NULL,
+
+    CONSTRAINT "TranscriptChunk_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE INDEX "TranscriptChunk_videoId_idx" ON "TranscriptChunk"("videoId");
+
+-- CreateIndex
+CREATE INDEX "GeneratedContent_videoId_userId_idx" ON "GeneratedContent"("videoId", "userId");
+
+-- CreateIndex
+CREATE INDEX "QuizQuestion_contentId_idx" ON "QuizQuestion"("contentId");
+
+-- AddForeignKey
+ALTER TABLE "TranscriptChunk" ADD CONSTRAINT "TranscriptChunk_videoId_fkey" FOREIGN KEY ("videoId") REFERENCES "Video"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+
+
+================================================
+FILE: prisma/migrations/20260211144131_add_profile_fields/migration.sql
+================================================
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "age" INTEGER,
+ADD COLUMN     "bio" TEXT,
+ADD COLUMN     "links" JSONB,
+ADD COLUMN     "location" TEXT;
+
+
+
+================================================
+FILE: prisma/migrations/20260331120549_add_cloud_url/migration.sql
+================================================
+-- AlterTable
+ALTER TABLE "Video" ADD COLUMN     "cloudUrl" TEXT;
+
+
+
+================================================
+FILE: prisma/migrations/20260410121932_add_tags_model/migration.sql
+================================================
+-- CreateTable
+CREATE TABLE "Tag" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "color" TEXT,
+    "userId" TEXT NOT NULL,
+
+    CONSTRAINT "Tag_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "_TagToVideoProgress" (
+    "A" TEXT NOT NULL,
+    "B" TEXT NOT NULL,
+
+    CONSTRAINT "_TagToVideoProgress_AB_pkey" PRIMARY KEY ("A","B")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Tag_userId_name_key" ON "Tag"("userId", "name");
+
+-- CreateIndex
+CREATE INDEX "_TagToVideoProgress_B_index" ON "_TagToVideoProgress"("B");
+
+-- AddForeignKey
+ALTER TABLE "Tag" ADD CONSTRAINT "Tag_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_TagToVideoProgress" ADD CONSTRAINT "_TagToVideoProgress_A_fkey" FOREIGN KEY ("A") REFERENCES "Tag"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_TagToVideoProgress" ADD CONSTRAINT "_TagToVideoProgress_B_fkey" FOREIGN KEY ("B") REFERENCES "VideoProgress"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+
+
+================================================
+FILE: prisma/migrations/20260414080010_add_llm_telemetry/migration.sql
+================================================
+-- AlterTable
+ALTER TABLE "GeneratedContent" ADD COLUMN     "latencyMs" INTEGER,
+ADD COLUMN     "tokensUsed" INTEGER;
+
+
+
+================================================
+FILE: prisma/migrations/20260417095659_add_audience_and_focus/migration.sql
+================================================
+-- AlterTable
+ALTER TABLE "GeneratedContent" ADD COLUMN     "audience" TEXT NOT NULL DEFAULT 'student',
+ADD COLUMN     "focus" TEXT NOT NULL DEFAULT 'theory';
+
+
+
+================================================
+FILE: prisma/migrations/20260420130027_add_gamification/migration.sql
+================================================
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "lastActiveAt" TIMESTAMP(3),
+ADD COLUMN     "level" INTEGER NOT NULL DEFAULT 1,
+ADD COLUMN     "streak" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "xp" INTEGER NOT NULL DEFAULT 0;
+
+
+
+================================================
+FILE: prisma/migrations/20260506114629_add_xp_logs/migration.sql
+================================================
+-- CreateTable
+CREATE TABLE "XpLog" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "amount" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "XpLog_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE INDEX "XpLog_userId_createdAt_idx" ON "XpLog"("userId", "createdAt");
+
+-- AddForeignKey
+ALTER TABLE "XpLog" ADD CONSTRAINT "XpLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+
+
+================================================
+FILE: prisma/migrations/20260601103749_add_ai_feedback/migration.sql
+================================================
+-- CreateTable
+CREATE TABLE "AiFeedback" (
+    "id" TEXT NOT NULL,
+    "isLiked" BOOLEAN NOT NULL,
+    "comment" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "userId" TEXT NOT NULL,
+    "generatedContentId" TEXT NOT NULL,
+
+    CONSTRAINT "AiFeedback_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE INDEX "AiFeedback_generatedContentId_idx" ON "AiFeedback"("generatedContentId");
+
+-- AddForeignKey
+ALTER TABLE "AiFeedback" ADD CONSTRAINT "AiFeedback_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AiFeedback" ADD CONSTRAINT "AiFeedback_generatedContentId_fkey" FOREIGN KEY ("generatedContentId") REFERENCES "GeneratedContent"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+
+================================================
+FILE: src/constants/app.ts
+================================================
+export const APP_CONFIG = {
+  GAMIFICATION: {
+    XP_PER_CORRECT_ANSWER: 10,
+    XP_COMPLETION_BONUS: 5,
+    XP_PER_LEVEL: 100,
+  },
+  QUIZ: {
+    TIME_WINDOW_START: 9,
+    TIME_WINDOW_END: 11,
+  },
+  API: {
+    YANDEX_GPT_TIMEOUT: 45000,
+    SPEECHKIT_POLLING_INTERVAL: 5000,
+    SPEECHKIT_FETCH_TIMEOUT: 15000,
+    YOUTUBE_FETCH_TIMEOUT: 3000,
+  },
+} as const;
+
+
+================================================
+FILE: src/services/analysis-orchestrator.ts
+================================================
+import prisma from '@/config/prisma';
+import { YandexCloudService } from '@/services/yandex';
+import { YoutubeService } from '@/services/youtube';
+import { S3Service } from '@/services/s3';
+import { SpeechKitService } from '@/services/speechkit';
+import { VideoDownloader } from '@/services/video-downloader';
+import { logger } from '@/config/logger';
+import {
+  AIInferenceResult,
+  AnalysisSettings,
+  VideoWithoutRelations,
+} from '@/shared/types';
+import { APP_CONFIG } from '@/constants/app';
+import { z } from 'zod';
+import { QuizQuestionSchema, FlashcardSchema } from '@/shared/schemas';
+
+export class AnalysisOrchestrator {
+  static async processVideo(
+    videoId: string,
+    userId: string,
+    settings: AnalysisSettings,
+  ) {
+    logger.info(
+      { videoId, settings },
+      'Starting ANALYSIS VIDEO in Orchestrator',
+    );
+
+    await prisma.video.update({
+      where: { id: videoId },
+      data: { status: 'PROCESSING' },
+    });
+
+    const video = await prisma.video.findUnique({
+      where: { id: videoId },
+      include: { transcriptChunks: true },
+    });
+
+    if (!video) throw new Error('Видео не найдено');
+
+    try {
+      // 1. Получение транскрипта
+      let contextText = '';
+
+      if (video.transcriptChunks.length > 0) {
+        contextText = video.transcriptChunks
+          .map((c) => `[${Math.floor(c.startTime)}s] ${c.text}`)
+          .join(' ');
+      } else {
+        let needsAudioExtraction = video.platform === 'vk';
+
+        if (video.platform === 'youtube') {
+          try {
+            contextText = await YoutubeService.fetchAndSaveTranscript(
+              video.url,
+              video.id,
+            );
+          } catch (e) {
+            logger.warn(
+              { videoId: video.id, err: e },
+              'YouTube transcript fetch failed. Falling back to audio extraction',
+            );
+            needsAudioExtraction = true;
+          }
+        }
+
+        if (needsAudioExtraction) {
+          contextText = await this.executeAudioExtractionPipeline(video);
+        }
+      }
+
+      // 2. Генерация контента через YandexGPT
+      const aiResults = await YandexCloudService.generateLearningContent(
+        contextText,
+        {
+          difficulty: settings.difficulty,
+          count: settings.questionsCount,
+          audience: settings.audience,
+          focus: settings.focus,
+        },
+      );
+
+      // 3. Сохранение результатов в БД
+      await this.saveResultsToDatabase(videoId, userId, settings, aiResults);
+
+      await prisma.video.update({
+        where: { id: videoId },
+        data: { status: 'COMPLETED' },
+      });
+
+      logger.info(
+        { videoId, success: true },
+        'Analysis Orchestration completed',
+      );
+    } catch (error) {
+      logger.error({ err: error, videoId }, 'Analysis Orchestration Failed');
+      await prisma.video.update({
+        where: { id: videoId },
+        data: { status: 'FAILED' },
+      });
+      throw error;
+    }
+  }
+
+  private static async executeAudioExtractionPipeline(
+    video: VideoWithoutRelations,
+  ): Promise<string> {
+    try {
+      const [localAudioPath, localVideoPath] = await Promise.all([
+        VideoDownloader.extractAudio(video.url, video.id),
+        VideoDownloader.extractVideo(video.url, video.id, 480),
+      ]);
+
+      const [s3AudioUrl, s3VideoUrl] = await Promise.all([
+        S3Service.uploadAudio(localAudioPath, video.id),
+        S3Service.uploadVideo(localVideoPath, video.id),
+      ]);
+
+      await prisma.video.update({
+        where: { id: video.id },
+        data: { cloudUrl: s3VideoUrl },
+      });
+
+      const taskId = await SpeechKitService.createTask(s3AudioUrl);
+
+      let isDone = false;
+      let result;
+      while (!isDone) {
+        await new Promise((r) =>
+          setTimeout(r, APP_CONFIG.API.SPEECHKIT_POLLING_INTERVAL),
+        );
+        const status = await SpeechKitService.getTaskStatus(taskId);
+        if (status.done) {
+          isDone = true;
+          result = await SpeechKitService.getRecognitionResult(taskId);
+        }
+      }
+
+      const parsedChunks = SpeechKitService.parseV3Response(result);
+      if (parsedChunks.length === 0)
+        throw new Error('SpeechKit вернул пустой результат');
+
+      await prisma.transcriptChunk.createMany({
+        data: parsedChunks.map((c) => ({
+          videoId: video.id,
+          startTime: c.startTime,
+          endTime: c.endTime,
+          text: c.text,
+        })),
+      });
+
+      return parsedChunks
+        .map((c) => `[${Math.floor(c.startTime)}s] ${c.text}`)
+        .join(' ');
+    } catch (e) {
+      logger.error(
+        { err: e, videoId: video.id },
+        'Audio Extraction / SpeechKit Pipeline Error',
+      );
+      throw new Error('Не удалось получить транскрипт или загрузить медиа');
+    }
+  }
+
+  private static async saveResultsToDatabase(
+    videoId: string,
+    userId: string,
+    settings: AnalysisSettings,
+    aiResults: AIInferenceResult,
+  ) {
+    const { content: aiContent, telemetry: aiTelemetry } = aiResults;
+
+    await prisma.$transaction(async (tx) => {
+      const generatedContent = await tx.generatedContent.create({
+        data: {
+          videoId,
+          userId,
+          difficulty: settings.difficulty,
+          mode: settings.mode,
+          audience: settings.audience,
+          focus: settings.focus,
+          summary: aiContent.summary,
+          latencyMs: aiTelemetry.latencyMs,
+          tokensUsed: aiTelemetry.tokensUsed,
+        },
+      });
+
+      if (aiContent.questions?.length > 0) {
+        await tx.quizQuestion.createMany({
+          data: aiContent.questions.map(
+            (q: z.infer<typeof QuizQuestionSchema>) => ({
+              contentId: generatedContent.id,
+              text: q.text,
+              timestamp: q.timestamp || 0,
+              options: q.options,
+              correctIdx: q.correctIdx,
+              explanation: q.explanation,
+            }),
+          ),
+        });
+      }
+
+      if (aiContent.flashcards?.length > 0) {
+        await tx.flashcard.createMany({
+          data: aiContent.flashcards.map(
+            (f: z.infer<typeof FlashcardSchema>) => ({
+              contentId: generatedContent.id,
+              term: f.term,
+              definition: f.definition,
+            }),
+          ),
+        });
+      }
+
+      if (aiContent.tags?.length > 0) {
+        const tagIds: string[] = [];
+        for (const tagName of aiContent.tags) {
+          const normalizedName =
+            tagName.trim().charAt(0).toUpperCase() +
+            tagName.trim().slice(1).toLowerCase();
+          if (!normalizedName) continue;
+
+          const tag = await tx.tag.upsert({
+            where: { userId_name: { userId, name: normalizedName } },
+            update: {},
+            create: { name: normalizedName, userId, color: '#6366f1' },
+          });
+          tagIds.push(tag.id);
+        }
+
+        if (tagIds.length > 0) {
+          await tx.videoProgress.update({
+            where: { userId_videoId: { userId, videoId } },
+            data: { tags: { connect: tagIds.map((id) => ({ id })) } },
+          });
+        }
+      }
+    });
+  }
+}
+
+
+
+================================================
+FILE: src/services/s3.ts
+================================================
+import { logger } from '@/config/logger';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import fs from 'fs';
+
+export class S3Service {
+  private static getClient() {
+    return new S3Client({
+      region: 'ru-central1',
+      endpoint: 'https://storage.yandexcloud.net',
+      credentials: {
+        accessKeyId: process.env.YANDEX_STORAGE_ACCESS_KEY || '',
+        secretAccessKey: process.env.YANDEX_STORAGE_SECRET_KEY || '',
+      },
+    });
+  }
+
+  static async uploadAudio(filePath: string, videoId: string): Promise<string> {
+    const bucketName = process.env.YANDEX_STORAGE_BUCKET_NAME;
+
+    if (!bucketName) {
+      throw new Error('YANDEX_STORAGE_BUCKET_NAME не определен в .env');
+    }
+
+    const fileContent = fs.readFileSync(filePath);
+    const key = `audio/${videoId}.mp3`;
+    const client = this.getClient();
+
+    try {
+      logger.info(
+        { videoId, filePath },
+        'Starting UPLOAD AUDIO to S3 yandex cloud',
+      );
+      await client.send(
+        new PutObjectCommand({
+          Bucket: bucketName,
+          Key: key,
+          Body: fileContent,
+          ContentType: 'audio/mpeg',
+        }),
+      );
+
+      logger.info(
+        { videoId, filePath },
+        'UPLOAD AUDIO to S3 yandex cloud completed',
+      );
+      return `https://storage.yandexcloud.net/${bucketName}/${key}`;
+    } catch (error) {
+      logger.error(
+        { err: error, videoId },
+        'UPLOAD AUDIO to S3 yandex cloud failed',
+      );
+      throw new Error('Ошибка при загрузке аудио в облако');
+    }
+  }
+
+  static async uploadVideo(filePath: string, videoId: string): Promise<string> {
+    const bucketName = process.env.YANDEX_STORAGE_BUCKET_NAME;
+    if (!bucketName) throw new Error('YANDEX_STORAGE_BUCKET_NAME не определен');
+
+    const fileContent = fs.readFileSync(filePath);
+    const key = `video/${videoId}.mp4`;
+    const client = this.getClient();
+
+    try {
+      logger.info(
+        { videoId, filePath },
+        'Starting UPLOAD VIDEO to S3 yandex cloud',
+      );
+      await client.send(
+        new PutObjectCommand({
+          Bucket: bucketName,
+          Key: key,
+          Body: fileContent,
+          ContentType: 'video/mp4',
+        }),
+      );
+
+      logger.info(
+        { videoId, filePath },
+        'UPLOAD VIDEO to S3 yandex cloud completed',
+      );
+      return `https://storage.yandexcloud.net/${bucketName}/${key}`;
+    } catch (error) {
+      logger.error(
+        { err: error, videoId },
+        'UPLOAD VIDEO to S3 yandex cloud failed',
+      );
+      throw new Error('Ошибка при загрузке видео в облако');
+    }
+  }
+}
+
+
+
+================================================
+FILE: src/services/speechkit.ts
+================================================
+import { logger } from '@/config/logger';
+import { APP_CONFIG } from '@/constants/app';
+import axios from 'axios';
+import pRetry from 'p-retry';
+
+interface SpeechKitV3Chunk {
+  result?: {
+    final?: {
+      alternatives?: Array<{
+        text: string;
+        words?: Array<{
+          startTimeMs: string;
+          endTimeMs: string;
+        }>;
+      }>;
+    };
+    finalRefinement?: {
+      normalizedText?: {
+        alternatives?: Array<{
+          text: string;
+          words?: Array<{
+            startTimeMs: string;
+            endTimeMs: string;
+          }>;
+        }>;
+      };
+    };
+  };
+}
+
+export interface SpeechKitResponse {
+  done: boolean;
+  id: string;
+  createdAt: string;
+  createdBy: string;
+  modifiedAt: string;
+  error?: {
+    code: number;
+    message: string;
+  };
+}
+
+export class SpeechKitService {
+  private static getApiKey() {
+    const key = process.env.YANDEX_API_KEY;
+    if (!key) throw new Error('YANDEX_API_KEY не найден в .env');
+    return key;
+  }
+
+  private static getFolderId() {
+    const id = process.env.YANDEX_FOLDER_ID;
+    if (!id) throw new Error('YANDEX_FOLDER_ID не найден в .env');
+    return id;
+  }
+
+  private static async fetchWithRetry<T>(
+    requestFn: (signal: AbortSignal) => Promise<T>,
+  ): Promise<T> {
+    return pRetry(
+      async () => {
+        const signal = AbortSignal.timeout(
+          APP_CONFIG.API.SPEECHKIT_FETCH_TIMEOUT,
+        );
+        return await requestFn(signal);
+      },
+      {
+        retries: 3,
+        minTimeout: 1000,
+        factor: 2,
+        onFailedAttempt: (error) => {
+          logger.warn(
+            {
+              attemptNumber: error.attemptNumber,
+              retriesLeft: error.retriesLeft,
+            },
+            'SpeechKit API call failed, retrying...',
+          );
+        },
+      },
+    );
+  }
+
+  static async createTask(fileUri: string): Promise<string> {
+    const apiKey = this.getApiKey();
+    const folderId = this.getFolderId();
+
+    try {
+      logger.info({ fileUri }, 'Starting CREATE TASK to S3 yandex cloud');
+
+      const response = await this.fetchWithRetry((signal) =>
+        axios.post(
+          'https://stt.api.cloud.yandex.net/stt/v3/recognizeFileAsync',
+          {
+            uri: fileUri,
+            recognition_model: {
+              model: 'general',
+              audio_format: {
+                container_audio: { container_audio_type: 'MP3' },
+              },
+              text_normalization: {
+                text_normalization: 'TEXT_NORMALIZATION_ENABLED',
+                profanity_filter: false,
+              },
+            },
+          },
+          {
+            headers: {
+              Authorization: `Api-Key ${apiKey}`,
+              'x-folder-id': folderId,
+            },
+            signal,
+          },
+        ),
+      );
+
+      logger.info(
+        { fileUri, taskId: response.data.id },
+        'CREATE TASK completed',
+      );
+      return response.data.id;
+    } catch (error) {
+      logger.error(
+        { err: error },
+        'CREATE TASK to S3 yandex cloud failed fatally',
+      );
+      throw error;
+    }
+  }
+
+  static async getTaskStatus(taskId: string): Promise<SpeechKitResponse> {
+    const apiKey = this.getApiKey();
+
+    const response = await axios.get(
+      `https://operation.api.cloud.yandex.net/operations/${taskId}`,
+      {
+        headers: {
+          Authorization: `Api-Key ${apiKey}`,
+          'x-folder-id': this.getFolderId(),
+        },
+        signal: AbortSignal.timeout(APP_CONFIG.API.SPEECHKIT_POLLING_INTERVAL),
+      },
+    );
+
+    return response.data;
+  }
+
+  static async getRecognitionResult(taskId: string) {
+    const apiKey = this.getApiKey();
+
+    const response = await this.fetchWithRetry((signal) =>
+      axios.get(
+        `https://stt.api.cloud.yandex.net/stt/v3/getRecognition?operation_id=${taskId}`,
+        {
+          headers: { Authorization: `Api-Key ${apiKey}` },
+          signal,
+        },
+      ),
+    );
+
+    return response.data;
+  }
+
+  static parseV3Response(rawResponse: unknown) {
+    const chunks: { startTime: number; endTime: number; text: string }[] = [];
+    let results: SpeechKitV3Chunk[] = [];
+
+    try {
+      logger.info('Starting PARSE AUDIO from speechkit');
+
+      if (typeof rawResponse === 'string') {
+        const normalizedResponse = rawResponse.replace(/\}\s*\{/g, '}|||{');
+        const jsonStrings = normalizedResponse.split('|||');
+        results = jsonStrings.map((str) => JSON.parse(str));
+      } else if (Array.isArray(rawResponse)) {
+        results = rawResponse as SpeechKitV3Chunk[];
+      } else {
+        results = [rawResponse as SpeechKitV3Chunk];
+      }
+
+      results.forEach((item) => {
+        const finalResult =
+          item.result?.final || item.result?.finalRefinement?.normalizedText;
+
+        if (
+          finalResult &&
+          finalResult.alternatives &&
+          finalResult.alternatives[0]
+        ) {
+          const alt = finalResult.alternatives[0];
+
+          if (alt.words && alt.words.length > 0) {
+            const startMs = parseInt(alt.words[0].startTimeMs);
+            const endMs = parseInt(alt.words[alt.words.length - 1].endTimeMs);
+
+            chunks.push({
+              startTime: startMs / 1000,
+              endTime: endMs / 1000,
+              text: alt.text,
+            });
+          }
+        }
+      });
+
+      logger.info('PARSE AUDIO from speechkit completed');
+    } catch (error) {
+      logger.error({ err: error }, 'PARSE AUDIO from speechkit failed');
+    }
+
+    return chunks;
+  }
+}
+
+
+
+================================================
+FILE: src/services/video-downloader.ts
+================================================
+import { YtDlp } from 'ytdlp-nodejs';
+import path from 'path';
+import fs from 'fs';
+import { logger } from '@/config/logger';
+
+export class VideoDownloader {
+  private static ytdlp = new YtDlp();
+
+  static async extractAudio(url: string, videoId: string): Promise<string> {
+    const tempDir = path.join(process.cwd(), 'temp-audio');
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+
+    const outputPath = path.join(tempDir, `${videoId}.mp3`);
+
+    try {
+      logger.info({ videoId, url }, 'Starting AUDIO extraction');
+
+      await this.ytdlp
+        .download(url)
+        .extractAudio()
+        .audioFormat('mp3')
+        .output(tempDir)
+        .setOutputTemplate(path.join(tempDir, `${videoId}.%(ext)s`))
+        .run();
+
+      logger.info({ videoId, outputPath }, 'AUDIO extraction completed');
+      return outputPath;
+    } catch (error) {
+      logger.error({ err: error, videoId, url }, 'Audio Extraction failed');
+      throw new Error('Не удалось извлечь аудио из видео');
+    }
+  }
+
+  static async extractVideo(
+    url: string,
+    videoId: string,
+    height: number = 480,
+  ): Promise<string> {
+    const tempDir = path.join(process.cwd(), 'temp-video');
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+
+    const outputPath = path.join(tempDir, `${videoId}.mp4`);
+
+    try {
+      logger.info({ videoId, url, height }, 'Starting VIDEO extraction');
+
+      await new YtDlp()
+        .download(url)
+        .format(`best[height<=${height}][ext=mp4]/best[height<=${height}]`)
+        .output(tempDir)
+        .setOutputTemplate(path.join(tempDir, `${videoId}.mp4`))
+        .run();
+
+      logger.info({ videoId, outputPath }, 'VIDEO extraction completed');
+      return outputPath;
+    } catch (error) {
+      logger.error(
+        { err: error, videoId, url, height },
+        'Video Extraction failed',
+      );
+      throw new Error('Не удалось скачать видео');
+    }
+  }
+}
+
+
+
+================================================
+FILE: src/services/video.ts
+================================================
+import { logger } from '@/config/logger';
+import prisma from '@/config/prisma';
+import { APP_CONFIG } from '@/constants/app';
+
+export const getVideosByUserId = async (userId: string) => {
+  try {
+    logger.info({ userId }, "Starting fetch USER'S VIDEOS from DB");
+    // Ищем видео, которые связаны с пользователем через GeneratedContent
+    const videos = await prisma.video.findMany({
+      where: {
+        OR: [
+          // Видео, где есть сгенерированный контент пользователя
+          {
+            generatedContents: {
+              some: {
+                userId: userId,
+              },
+            },
+          },
+          // ИЛИ видео, которые пользователь начал смотреть/добавил (Progress)
+          {
+            progress: {
+              some: {
+                userId: userId,
+              },
+            },
+          },
+        ],
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      include: {
+        progress: {
+          where: {
+            userId: userId,
+          },
+          include: {
+            tags: true,
+          },
+          take: 1,
+        },
+      },
+    });
+
+    logger.info(
+      { userId, videosLength: videos.length },
+      "Fetch USER'S VIDEOS from DB completed",
+    );
+    return videos;
+  } catch (error) {
+    logger.error({ err: error, userId }, "Fetch USER'S VIDEOS from DB failed");
+    throw error;
+  }
+};
+
+export const getVideoById = async (videoId: string, userId: string) => {
+  try {
+    logger.info({ videoId, userId }, 'Starting fetch VIDEO from DB');
+    const video = await prisma.video.findFirst({
+      where: {
+        id: videoId,
+        // Проверяем, что пользователь имеет отношение к этому видео
+        // (либо есть прогресс, либо сгенерированный контент)
+        OR: [
+          { progress: { some: { userId } } },
+          { generatedContents: { some: { userId } } },
+        ],
+      },
+      include: {
+        progress: {
+          where: { userId },
+          include: { tags: true },
+          take: 1,
+        },
+        // Подтягиваем сгенерированный контент для этого юзера
+        generatedContents: {
+          where: { userId },
+          include: {
+            questions: true,
+            flashcards: true,
+          },
+          take: 1,
+        },
+        transcriptChunks: {
+          orderBy: {
+            startTime: 'asc',
+          },
+        },
+      },
+    });
+
+    logger.info(
+      { videoId, userId, videoTitle: video?.title },
+      'Fetch VIDEO from DB completed',
+    );
+    return video;
+  } catch (error) {
+    logger.error({ err: error, videoId, userId }, 'Fetch VIDEO from DB failed');
+    throw error;
+  }
+};
+
+export const deleteVideoFromUser = async (videoId: string, userId: string) => {
+  try {
+    logger.info({ videoId, userId }, 'Starting DELETE VIDEO from DB');
+    return await prisma.$transaction(async (tx) => {
+      await tx.videoProgress.deleteMany({
+        where: { videoId, userId },
+      });
+
+      await tx.generatedContent.deleteMany({
+        where: { videoId, userId },
+      });
+
+      logger.info(
+        { videoId, userId, success: true },
+        'DELETE VIDEO from DB completed',
+      );
+      return { success: true };
+    });
+  } catch (error) {
+    logger.error(
+      { err: error, videoId, userId },
+      'DELETE VIDEO from DB failed',
+    );
+    throw new Error('Ошибка при удалении данных видео');
+  }
+};
+
+export const addVideoToLibrary = async (
+  url: string,
+  platform: 'youtube' | 'vk',
+  externalId: string,
+  userId: string,
+) => {
+  let videoTitle = `${platform.toUpperCase()} Video ${externalId}`;
+  let thumbnail = '';
+
+  if (platform === 'youtube') {
+    thumbnail = `https://img.youtube.com/vi/${externalId}/maxresdefault.jpg`;
+
+    try {
+      const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${externalId}&format=json`;
+      const response = await fetch(oembedUrl, {
+        signal: AbortSignal.timeout(APP_CONFIG.API.YOUTUBE_FETCH_TIMEOUT),
+      });
+      if (response.ok) {
+        const metadata = await response.json();
+        if (metadata.title) videoTitle = metadata.title;
+      }
+    } catch (error) {
+      logger.warn(
+        { err: error, videoId: externalId },
+        'YouTube oEmbed fetch timed out.',
+      );
+    }
+  }
+
+  const video = await prisma.video.upsert({
+    where: { url },
+    update: {},
+    create: {
+      url,
+      platform,
+      externalId,
+      thumbnail,
+      title: videoTitle,
+      status: 'PENDING',
+    },
+  });
+
+  await prisma.videoProgress.upsert({
+    where: {
+      userId_videoId: { userId, videoId: video.id },
+    },
+    update: { updatedAt: new Date() },
+    create: {
+      userId,
+      videoId: video.id,
+      timestamp: 0,
+      isCompleted: false,
+    },
+  });
+
+  return video.id;
+};
+
+
+
+================================================
+FILE: src/services/yandex.ts
+================================================
+import OpenAI from 'openai';
+import { AIGeneratedContentSchema } from '@/shared/schemas';
+import { logger } from '@/config/logger';
+import pRetry from 'p-retry';
+import { APP_CONFIG } from '@/constants/app';
+
+export class YandexCloudService {
+  private static apiKey = process.env.YANDEX_API_KEY;
+  private static folderId = process.env.YANDEX_FOLDER_ID;
+
+  private static openai = new OpenAI({
+    apiKey: this.apiKey,
+    baseURL: 'https://ai.api.cloud.yandex.net/v1',
+    project: this.folderId,
+  });
+
+  static async generateLearningContent(
+    transcript: string,
+    settings: {
+      difficulty: string;
+      count: number;
+      audience: string;
+      focus: string;
+    },
+  ) {
+    const audiencePrompt =
+      settings.audience === 'schoolboy'
+        ? 'Объясняй максимально просто, на пальцах и понятных примерах из жизни, как для школьника.'
+        : settings.audience === 'expert'
+          ? 'Используй строгий академический язык, делай упор на профессиональную терминологию без лишней "воды".'
+          : 'Стиль изложения должен быть сбалансированным, академичным, но понятным, как для студента университета.';
+
+    const focusPrompt =
+      settings.focus === 'practice'
+        ? 'Сделай упор на практическое применение сказанного и реальные кейсы.'
+        : settings.focus === 'facts'
+          ? 'Сконцентрируйся только на ключевых датах, фактах, именах и цифрах.'
+          : 'Выдели основную теорию и фундаментальные концепции.';
+
+    const systemPrompt = `Ты — ведущий методист образовательных платформ. Твоя задача: превратить сырой транскрипт видео с метками времени [Xs] в структурированный конспект и интерактивный тест.
+
+ИНСТРУКЦИИ:
+1. SUMMARY: 
+    - Напиши четкий образовательный конспект в формате Markdown. Используй заголовки (##), жирный текст для терминов, другие выделения (*, **, *** и другие) и маркированные списки. Убери "мусор", мелкие ошибки транскрипта, приветствия и повторы.
+    - ${audiencePrompt}
+    - ${focusPrompt}
+    - Сохраняй авторский стиль спикера (если он шутит — оставь легкий тон, если строг — будь формальным).
+    - Вставляй в конспект кликабельные ключевые метки времени в формате [...s] (например [164s]) в конце каждого ключевого тезиса или раздела (например, [54s]), основываясь на данных из транскрипта. Оставляй таймкоды в исходном виде [...s], не пытайся переводить их в минуты.
+2. QUESTIONS: Сгенерируй до ${settings.count} вопросов, равномерно распределив по все длине видео. ВНИМАНИЕ: Если видео короткое и фактов мало, сгенерируй МЕНЬШЕ вопросов, не придумывай то, чего нет в тексте и не говорится в самом видео.
+   - Сложность "${settings.difficulty}": 
+     * 'easy' — вопросы на знание конкретных фактов, четко произнесенных в видео;
+     * 'medium' — вопросы на понимание логики и причин;
+     * 'hard' — вопросы на анализ и выводы из сказанного.
+   - ЛОГИКА ТАЙМКОДОВ (КРИТИЧНО): Вопрос должен появляться ТОЛЬКО ПОСЛЕ того, как информация была полностью озвучена. 
+     Пример: если информация для вопроса содержится в блоке "[10s] Текст ответа... [25s]", ты обязан поставить "timestamp": 25. 
+     Ты должен найти метку времени, которая идет СРАЗУ ПОСЛЕ предложения, содержащего ответ. Видео должно остановиться на паузу в момент логического завершения мысли, а не в её начале.
+     Запрещена метка времени
+    - ЗАПРЕТ: "timestamp" вопроса не может быть больше, чем последняя временная метка в предоставленном транскрипте. Не ставь вопросы на самую последнюю секунду видео, чтобы пользователь успел ответить до завершения ролика.
+3. FLASHCARDS: Выдели 3-5 ключевых терминов или концепций из видео и сделай из них карточки (термин + определение).
+4. TAGS: Сгенерируй от 1 до 3 коротких тегов (категорий), к которым относится это видео (например: "Программирование", "История", "React", "ОБЖ", "Обществознание", "Математика").
+5. JSON: Твой ответ должен содержать ТОЛЬКО валидный объект JSON. Без лищних слов и маркдаун оберток вроде \`\`\`json.
+
+СТРУКТУРА JSON:
+{
+  "summary": "текст конспекта",
+  "questions": [
+    {
+      "text": "Текст вопроса",
+      "timestamp": число_из_текста_в_секундах,
+      "options": ["вариант1", "вариант2", "вариант3", "вариант4"],
+      "correctIdx": индекс_верного,
+      "explanation": "Одна пояснительная фраза, почему этот ответ верный."
+    }
+  ],
+  "flashcards": [
+    { "term": "Понятие", "definition": "Краткое определение" }
+  ],
+  "tags": ["Тег1", "Тег2"]
+}`;
+
+    const runInference = async () => {
+      logger.info(
+        { settings, transcriptLength: transcript.length },
+        'Requesting YandexGPT for learning content',
+      );
+
+      const signal = AbortSignal.timeout(APP_CONFIG.API.YANDEX_GPT_TIMEOUT);
+      const startTime = performance.now();
+
+      const response = await this.openai.chat.completions.create(
+        {
+          model: `gpt://${this.folderId}/yandexgpt/latest`,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            {
+              role: 'user',
+              content: `Вот транскрипт с таймкодами: ${transcript}. 
+    Сложность: ${settings.difficulty}. 
+    Количество вопросов: ${settings.count}. 
+    Расставь вопросы равномерно по видео, используя реальные метки времени из текста, избегая начальный и конечный края видео.`,
+            },
+          ],
+          temperature: 0.3,
+        },
+        { signal },
+      );
+
+      const endTime = performance.now();
+      const latencyMs = Math.round(endTime - startTime);
+      const tokensUsed = response.usage?.total_tokens || 0;
+
+      const content = response.choices[0].message.content || '';
+      logger.debug(
+        { responseContent: content.substring(0, 100), latencyMs, tokensUsed },
+        'Received response from YandexGPT',
+      );
+
+      if (
+        content.includes('Я не могу') ||
+        content.includes('прошу прощения') ||
+        content.includes('ответить на этот вопрос')
+      ) {
+        throw new Error(
+          'CENSORED: YandexGPT заблокировал контент из-за внутренних фильтров безопасности (политика, 18+ и т.д.).',
+        );
+      }
+
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        logger.error(
+          { contentFragment: content.substring(0, 100) },
+          'YandexGPT returned non-JSON format',
+        );
+        throw new Error(
+          'INVALID_FORMAT: Ответ нейросети не содержит структурированных данных (JSON)',
+        );
+      }
+
+      const cleanJson = jsonMatch[0];
+      const parsedJson = JSON.parse(cleanJson);
+      const validatedData = AIGeneratedContentSchema.parse(parsedJson);
+
+      logger.info('Learning content successfully generated and validated');
+
+      return {
+        content: validatedData,
+        telemetry: {
+          latencyMs,
+          tokensUsed,
+        },
+      };
+    };
+
+    try {
+      return await pRetry(runInference, {
+        retries: 2,
+        minTimeout: 2000,
+        maxTimeout: 10000,
+        onFailedAttempt: (error) => {
+          logger.warn(
+            {
+              attemptNumber: error.attemptNumber,
+              retriesLeft: error.retriesLeft,
+              message: error instanceof Error ? error.message : String(error),
+            },
+            'YandexGPT request failed, retrying...',
+          );
+        },
+      });
+    } catch (error) {
+      logger.error({ err: error }, 'Yandex AI Studio Error after all retries');
+      throw new Error(
+        'Не удалось получить обучающий контент от YandexGPT после нескольких попыток',
+      );
+    }
+  }
+}
+
+
+
+================================================
+FILE: src/services/youtube.ts
+================================================
+import { YoutubeTranscript } from 'youtube-transcript';
+import prisma from '@/config/prisma';
+import { logger } from '@/config/logger';
+
+export class YoutubeService {
+  /**
+   * Получает транскрипт с YouTube и сохраняет его в базу данных как чанки.
+   * Возвращает склеенный текст с таймкодами для передачи в LLM.
+   */
+  static async fetchAndSaveTranscript(videoUrl: string, videoId: string) {
+    try {
+      logger.info({ videoId, videoUrl }, 'Starting fetch YOUTUBE TRANSCRIPT');
+      const transcriptItems = await YoutubeTranscript.fetchTranscript(
+        videoUrl,
+        {
+          lang: 'ru',
+        },
+      );
+
+      if (!transcriptItems || transcriptItems.length === 0) {
+        throw new Error('Транскрипт пуст или не найден');
+      }
+
+      await prisma.transcriptChunk.createMany({
+        data: transcriptItems.map((item) => ({
+          videoId: videoId,
+          startTime: item.offset / 1000,
+          endTime: (item.offset + item.duration) / 1000,
+          text: item.text,
+        })),
+      });
+
+      const fullTextWithTimestamps = transcriptItems
+        .map((item) => `[${Math.floor(item.offset / 1000)}s] ${item.text}`)
+        .join(' ');
+
+      logger.info(
+        { videoId, transcriptLength: fullTextWithTimestamps.length },
+        'Fetch YOUTUBE TRANSCRIPT completed',
+      );
+      return fullTextWithTimestamps;
+    } catch (error) {
+      logger.error(
+        { err: error, videoId, videoUrl },
+        'Fetch YOUTUBE TRANSCRIPT failed',
+      );
+      throw new Error('Не удалось получить субтитры для видео с youtube');
+    }
+  }
+}
