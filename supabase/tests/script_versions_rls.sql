@@ -18,6 +18,15 @@ select set_config('test.version_id',public.save_script_version(current_setting('
 update public.projects set topic = 'New topic' where id = current_setting('test.project_id')::uuid;
 select public.save_script_version(current_setting('test.project_id')::uuid,'Second script');
 do $$ begin
+ if not exists(select 1 from public.script_versions where id = current_setting('test.version_id')::uuid and source='manual') then raise exception 'Default source incorrect'; end if;
+ begin
+  perform public.save_script_version_internal(current_setting('test.project_id')::uuid,'Bypass');
+  raise exception 'Internal function exposed';
+ exception when insufficient_privilege then null; end;
+ begin
+  perform public.save_script_version(current_setting('test.project_id')::uuid,'Bad source','invalid');
+  raise exception 'Invalid source accepted';
+ exception when invalid_parameter_value then null; end;
  if not exists(select 1 from public.script_versions where id = current_setting('test.version_id')::uuid
  and version_number = 1 and content = 'First script' and settings_snapshot->>'topic' = 'Original topic') then raise exception 'First version changed'; end if;
  if not exists(select 1 from public.script_versions where project_id = current_setting('test.project_id')::uuid
