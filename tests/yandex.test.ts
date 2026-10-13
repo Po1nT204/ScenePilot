@@ -37,3 +37,35 @@ test("HTTP and network errors never retry or expose response body",async()=>{
 test("oversized prompt is rejected before any request",async()=>{
  await assert.rejects(requestYandexScript(config,{...brief,topic:"x".repeat(6001)},async()=>{assert.fail("Network must not be called");}),/Слишком длинные/);
 });
+
+import {parseSceneContent,requestYandexScenes} from "../src/lib/ai/yandex-client";
+test("scene JSON rejects missing, empty, malformed and oversized fields",()=>{
+ for(const value of ["not json",'{"scenes":[]}',JSON.stringify({scenes:[{description:"x",visual_prompt:"x"}]}),JSON.stringify({scenes:[{description:"x",visual_prompt:"x",narration:"x".repeat(2001)}]}),JSON.stringify({scenes:Array(13).fill({description:"x",visual_prompt:"x",narration:"x"})})]) assert.throws(()=>parseSceneContent(value));
+});
+test("scene parser discards identifiers supplied by model and trims fields",()=>{
+ assert.deepEqual(parseSceneContent(JSON.stringify({scenes:[{id:"forged",script_version_id:"foreign",description:" кадр ",visual_prompt:" свет ",narration:" речь "}]})),[{description:"кадр",visual_prompt:"свет",narration:"речь"}]);
+});
+test("scene request uses JSON mode, larger output cap and exact saved text",async()=>{
+ let calls=0;
+ const scenes=[{description:"Frame",visual_prompt:"A room",narration:"Saved narration."}];
+ const result=await requestYandexScenes(config,"Saved narration.",brief,async(_url,init)=>{
+  calls++;
+  const body=JSON.parse(String(init?.body));
+  assert.equal(body.jsonObject,true);assert.equal(body.completionOptions.maxTokens,"4000");
+  const input=JSON.parse(body.messages[1].text);
+  assert.equal(input.script,"Saved narration.");assert.equal(input.style,brief.style);
+  return Response.json({alternatives:[{status:"ALTERNATIVE_STATUS_FINAL",message:{text:JSON.stringify({scenes})}}],usage:{totalTokens:"300"}});
+ });
+ assert.deepEqual(result,{scenes,tokens:300});assert.equal(calls,1);
+});
+test("scene generation rejects truncated JSON without retry",async()=>{
+ let calls=0;
+ await assert.rejects(requestYandexScenes(config,"Saved script",brief,async()=>{
+  calls++;
+  return Response.json({alternatives:[{status:"ALTERNATIVE_STATUS_TRUNCATED_FINAL",message:{text:'{"scenes":['}}]});
+ }),/неполный/);
+ assert.equal(calls,1);
+});
+test("oversized script is rejected before a paid scene request",async()=>{
+ await assert.rejects(requestYandexScenes(config,"x".repeat(20001),brief,async()=>{assert.fail("Must not call network");}),/слишком длинный/);
+});
