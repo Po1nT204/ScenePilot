@@ -24,7 +24,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
    <p className="project-full-topic">{project.topic}</p>
    <dl className="project-facts"><div><dt>Жанр</dt><dd>{project.genre}</dd></div><div><dt>Стиль</dt><dd>{project.style}</dd></div><div><dt>Язык</dt><dd>{project.language === "ru" ? "Русский" : "Английский"}</dd></div><div><dt>Длительность</dt><dd>{project.target_duration_seconds} сек.</dd></div></dl>
    <Link className="button" href={"/projects/" + id + "?edit=1"}>Редактировать проект</Link>
-   <section className="workspace"><div><h2>Дальше — сценарий</h2><p>Сценарии и версии появятся на следующем этапе. Сейчас можно сохранить и уточнить идею.</p></div></section>
+   <section className="workspace"><div><h2>Сценарий и версии</h2><p>Напишите сценарий и сохраните версию. Каждая правка сохраняется отдельно от предыдущего текста.</p><Link className="button" href={`/projects/${id}/scripts`}>Открыть сценарий</Link></div></section>
    <DeleteProjectForm id={id} />
   </>}
  </section>;
