@@ -437,6 +437,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid #b35a28; outline-
 @media (max-width: 480px) { .auth-shell { margin-block: 32px; } .auth-card { padding: 24px; } .auth-title { font-size: 29px; } .workspace { flex-wrap: wrap; } }
 
 /* Projects */
+.scene-page { padding-bottom: 60px; }
+.scene-page h1 { overflow-wrap: anywhere; }
+.scene-workspace { margin-top: 28px; }
+.scene-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 24px; }
+.scene-card { padding: 24px; border: 1px solid var(--line); border-radius: 12px; background: #fffefa; min-width: 0; max-width: none; }
+.scene-card textarea { min-height: 90px; }
 .project-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 28px; }
 .project-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 22px; margin: 30px 0 60px; }
 .project-card { border: 1px solid var(--line); border-radius: 10px; padding: 26px; background: #fffefa; min-width: 0; }
