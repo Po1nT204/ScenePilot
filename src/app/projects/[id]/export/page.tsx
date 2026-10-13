@@ -1,0 +1,32 @@
+import Link from "next/link";
+import {notFound} from "next/navigation";
+import {requireProjectUser} from "@/lib/projects/server";
+import {isProjectId} from "@/lib/projects/validation";
+import {ExportPanel} from "@/components/export-panel";
+import {sourceLabel,type ExportSnapshot} from "@/lib/export";
+export const dynamic="force-dynamic";
+export const metadata={title:"Экспорт — ScenePilot"};
+export default async function ExportPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{version?:string}>}) {
+ const {supabase,user}=await requireProjectUser();
+ const {id}=await params;
+ const {version:versionId}=await searchParams;
+ if(!isProjectId(id)||!versionId||!isProjectId(versionId)) notFound();
+ const project=await supabase.from("projects").select("id").eq("id",id).eq("owner_id",user.id).maybeSingle();
+ if(project.error) throw new Error("Project unavailable");
+ if(!project.data) notFound();
+ const version=await supabase.from("script_versions").select("id,version_number,created_at,content,settings_snapshot,source").eq("id",versionId).eq("project_id",id).maybeSingle();
+ if(version.error) throw new Error("Version unavailable");
+ if(!version.data) notFound();
+ const scenes=await supabase.from("scenes").select("script_version_id,position,description,visual_prompt,narration,source").eq("script_version_id",versionId).order("position");
+ if(scenes.error) return <section><h1>Экспорт недоступен</h1><p role="alert">Не удалось загрузить сохранённые сцены. Обновите страницу позже. Неполный файл не сформирован.</p><Link href={`/projects/${id}/scripts?version=${versionId}`}>Вернуться к сценарию</Link></section>;
+ const saved=version.data;
+ const snapshot=saved.settings_snapshot as ExportSnapshot;
+ return <section className="project-editor">
+  <Link className="text-link" href={`/projects/${id}/scripts?version=${versionId}`}>← К сценарию версии {saved.version_number}</Link>
+  <p className="eyebrow project-label">МАТЕРИАЛЫ ДЛЯ ПРОИЗВОДСТВА</p>
+  <h1 className="auth-title">Экспорт: {snapshot.title}</h1>
+  <p>Версия {saved.version_number} · {sourceLabel(saved.source)} · Сохранённых сцен: {scenes.data.length}</p>
+  <p className="success-notice">Выгружаются сохранённый сценарий, его настройки и текущий сохранённый набор сцен этой версии. Несохранённые правки в файл не входят. Если сцены изменились в другой вкладке, обновите эту страницу.</p>
+  <ExportPanel document={{versionId:saved.id,versionNumber:saved.version_number,createdAt:saved.created_at,content:saved.content,source:saved.source,snapshot,scenes:scenes.data}} />
+ </section>;
+}

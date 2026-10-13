@@ -20,6 +20,7 @@ export default async function ScenesPage({params,searchParams}: {params:Promise<
   <p className="eyebrow project-label">РАСКАДРОВКА · ВЕРСИЯ {version.data.version_number}</p>
   <h1 className="auth-title">{project.data.title}</h1>
   <p>Сцены относятся только к версии {version.data.version_number}. Новая версия сценария получает отдельный набор сцен.</p>
+  <p><Link className="text-link" href={`/projects/${id}/export?version=${versionId}`}>Экспорт сохранённого сценария и сцен</Link></p>
   <details><summary>Исходный сценарий версии {version.data.version_number}</summary><p className="project-full-topic">{version.data.content}</p></details>
   {result.error ? <p role="alert">{["PGRST205","42P01"].includes(result.error.code) ? "Выполните миграцию 202610130002_create_scenes.sql из README в Supabase SQL Editor." : "Не удалось загрузить сцены. Обновите страницу позже."}</p> : <SceneEditor key={versionId} projectId={id} versionId={versionId} initial={result.data.map(({description,visual_prompt,narration})=>({description,visual_prompt,narration}))} initialSource={result.data[0]?.source === "yandex" ? "yandex" : "test"} yandexEnabled={yandexReady()} />}
  </section>;

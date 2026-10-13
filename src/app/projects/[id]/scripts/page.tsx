@@ -34,6 +34,7 @@ export default async function ScriptsPage({ params, searchParams }: { params: Pr
   {snapshot && <details><summary>Настройки на момент сохранения версии {version?.version_number}</summary><p>{snapshot.title}: {snapshot.topic}</p><p>{snapshot.genre} · {snapshot.style} · {snapshot.language === "ru" ? "Русский" : "Английский"} · {snapshot.target_duration_seconds} сек.</p></details>}
   <p className="field-hint">Новая версия получит текущие настройки проекта. Старые версии и их настройки остаются неизменными.</p>
   {version && <div className="workspace"><div><h2>От текста к сценам</h2><p>Откройте раскадровку сохранённой версии {version.version_number}: описание кадра, визуальный промпт и озвучка.</p><Link className="button" href={`/projects/${id}/scenes?version=${version.id}`}>Сцены версии {version.version_number}</Link></div></div>}
+  {version && <p><Link className="text-link" href={`/projects/${id}/export?version=${version.id}`}>Экспорт сохранённой версии {version.version_number} и сцен</Link></p>}
   <ScriptEditor key={version?.id ?? "new"} projectId={id} initial={version?.content ?? ""} versionNumber={version?.version_number} initialSource={version?.source ?? "manual"} yandexEnabled={yandexReady()} />
  </section>;
 }
