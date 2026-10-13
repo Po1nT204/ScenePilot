@@ -8,7 +8,7 @@
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "tsx --test tests/project-validation.test.ts tests/script-validation.test.ts"
+    "test": "tsx --test tests/project-validation.test.ts tests/script-validation.test.ts tests/test-generator.test.ts"
   },
   "engines": {
     "node": ">=20.19.0"
