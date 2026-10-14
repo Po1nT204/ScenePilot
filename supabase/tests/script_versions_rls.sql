@@ -1,4 +1,4 @@
--- Replace with two existing TEST user IDs. Run the entire file after both migrations.
+-- Replace with two existing TEST user IDs. Run after all migrations, including script_source.
 begin;
 select set_config('test.user_a', 'REPLACE_WITH_USER_A_UUID', true);
 select set_config('test.user_b', 'REPLACE_WITH_USER_B_UUID', true);

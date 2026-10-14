@@ -16,7 +16,7 @@ with inserted as (
 select set_config('test.version_id',public.save_script_version(current_setting('test.project_id')::uuid,'First version')::text,true);
 select set_config('test.version_2',public.save_script_version(current_setting('test.project_id')::uuid,'Second version')::text,true);
 select public.save_scenes(current_setting('test.version_id')::uuid,'[{"description":"Frame","visual_prompt":"Prompt","narration":"Speech"}]','yandex');
-do $ begin
+do $$ begin
  begin
   perform public.save_scenes(current_setting('test.version_id')::uuid,'[]','invalid');
   raise exception 'Invalid source accepted';
