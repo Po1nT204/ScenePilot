@@ -19,7 +19,11 @@ export async function saveProject(projectId: string | null, _previous: ProjectSt
  } catch { return { message: "Сервис недоступен. Ваш ввод сохранён в форме; попробуйте ещё раз.", values: checked.values }; }
  revalidatePath("/projects");
  revalidatePath("/projects/" + savedId);
- redirect("/projects/" + savedId + "?saved=1");
+ // A navigation hint only: it never determines which project or version is written.
+ // The destination page checks that this UUID belongs to the user's project.
+ const navigationVersion = formData.get("navigationVersion");
+ const versionSuffix = projectId && isProjectId(navigationVersion) ? `&version=${navigationVersion}` : "";
+ redirect("/projects/" + savedId + "?saved=1" + versionSuffix);
 }
 export async function deleteProject(projectId: string, _previous: ProjectState, formData: FormData): Promise<ProjectState> {
  if (!isProjectId(projectId)) return { message: "Проект не найден или недоступен." };

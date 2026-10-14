@@ -3,11 +3,12 @@ import { useActionState } from "react";
 import Link from "next/link";
 import { saveProject } from "@/app/projects/actions";
 import { emptyProject, projectLimits, type ProjectState, type ProjectValues } from "@/lib/projects/validation";
-const labels = { title: "Название проекта", topic: "Тема и идея", genre: "Жанр", style: "Стиль" };
-export function ProjectForm({ id = null, initial = emptyProject }: { id?: string | null; initial?: ProjectValues }) {
+const labels = { title: "Название ролика", topic: "Тема и идея", genre: "Жанр", style: "Стиль" };
+export function ProjectForm({ id = null, initial = emptyProject, navigationVersion }: { id?: string | null; initial?: ProjectValues; navigationVersion?: string }) {
  const [state, action, pending] = useActionState(saveProject.bind(null, id), { message: "", values: initial } as ProjectState);
  const values = state.values ?? initial;
  return <form action={action} className="auth-form project-form">
+  {navigationVersion && <input type="hidden" name="navigationVersion" value={navigationVersion} />}
   <fieldset disabled={pending}>
    {(["title", "topic", "genre", "style"] as const).map((field) => <div key={field}>
     <label htmlFor={field}>{labels[field]}</label>
@@ -22,9 +23,9 @@ export function ProjectForm({ id = null, initial = emptyProject }: { id?: string
    <input id="duration" name="duration" type="number" min={1} max={300} step={1} defaultValue={values.duration} required aria-invalid={!!state.errors?.duration} aria-describedby="duration-hint duration-error" />
    <p id="duration-hint" className="field-hint">От 1 до 300 секунд. Это ориентир для будущего сценария.</p>
    <p id="duration-error" className="field-error">{state.errors?.duration}</p>
-   <button type="submit" className="button">{pending ? "Сохраняем…" : id ? "Сохранить изменения" : "Создать проект"}</button>
+   <button type="submit" className="button">{pending ? "Сохраняем…" : id ? "Сохранить изменения" : "Создать ролик"}</button>
   </fieldset>
   <p className="form-message" role="status">{state.message}</p>
-  <p><Link className="text-link" href={id ? "/projects/" + id : "/projects"}>Отмена</Link></p>
+  <p><Link className="text-link" href={id ? "/projects/" + id + (navigationVersion ? `?version=${navigationVersion}` : "") : "/projects"}>Отмена</Link></p>
  </form>;
 }

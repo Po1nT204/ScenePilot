@@ -36,6 +36,7 @@ export async function saveScenes(projectId: string, versionId: string, scenes: u
   const { error } = await supabase.rpc("save_scenes", { p_version_id: versionId, p_source:source, p_scenes: scenes.map(({description,visual_prompt,narration}) => ({description,visual_prompt,narration})) });
   if (error) return { error: error.code === "PGRST202" ? "Выполните миграцию 202610130004_yandex_scenes.sql из README. Правки остаются в редакторе." : "Не удалось сохранить сцены. Правки остаются в редакторе; проверьте сохранённый набор перед повтором." };
   revalidatePath(`/projects/${projectId}/scenes`);
+  revalidatePath("/projects");
   return { error: "" };
  } catch { return { error: "Соединение прервано или версия недоступна. Правки остаются в редакторе." }; }
 }

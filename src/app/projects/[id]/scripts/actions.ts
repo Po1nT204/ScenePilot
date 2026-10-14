@@ -19,6 +19,7 @@ export async function saveScript(projectId: string, _previous: ScriptState, form
   if (error) return { message: error.code === "PGRST202" ? "Выполните миграцию 202610130003_script_source.sql из README. Текст остаётся в редакторе." : "Не удалось сохранить версию. Текст остаётся в редакторе. Проверьте историю перед повторной попыткой." };
   if (typeof data !== "string" || !isProjectId(data)) return { message: "Не удалось подтвердить сохранение. Проверьте историю версий." };
   revalidatePath("/projects/" + projectId + "/scripts");
+  revalidatePath("/projects");
   return { message: "Новая версия сохранена.", savedId: data };
  } catch {
   return { message: "Соединение прервано. Текст остаётся в редакторе. Проверьте историю перед повторной попыткой." };
