@@ -15,6 +15,7 @@ export async function saveChannel(_previous: ChannelState, form: FormData): Prom
     const result = existing.data
       ? await supabase.from("channel_profiles").update(checked.values).eq("owner_id", user.id).select("owner_id").maybeSingle()
       : await supabase.from("channel_profiles").insert({ ...checked.values, owner_id: user.id }).select("owner_id").single();
+    if (result.error?.code === "23514") return { values: checked.values, message: "База отклонила значения профиля. Если лимиты были увеличены, выполните миграцию 202610150002_channel_profile_limits.sql по docs/setup.md и повторите сохранение. Введённый текст остаётся в форме." };
     if (result.error || !result.data) return { values: checked.values, message: "Не удалось сохранить профиль. Проверьте соединение; если профиль создан в другой вкладке, обновите страницу." };
     revalidatePath("/projects/channel");
     revalidatePath("/projects/new");

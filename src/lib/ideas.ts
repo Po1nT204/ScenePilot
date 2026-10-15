@@ -1,4 +1,4 @@
-import type { ChannelProfile } from "./channel";
+import { channelProjectDefaults, type ChannelProfile } from "./channel";
 import { projectLimits } from "./projects/validation";
 
 export type Idea = { title: string; topic: string; genre: string; style: string };
@@ -32,6 +32,7 @@ export function parseIdeas(content: string): Idea[] {
 
 export function testIdeas(request: IdeaRequest): Idea[] {
   const en = request.language === "en";
+  const defaults = channelProjectDefaults(request.channel);
   const seed = request.seed.slice(0, 75);
   const angles = en ? ["How it works", "What changed", "A common misconception"] : ["Как это работает", "Что изменилось", "Распространённое заблуждение"];
   return angles.map(angle => ({
@@ -39,7 +40,7 @@ export function testIdeas(request: IdeaRequest): Idea[] {
     topic: en
       ? `TEST TEMPLATE. Topic as entered: ${request.seed}. Angle: ${angle}. Explain one idea, add an example and check factual claims. Audience: ${request.channel?.audience ?? "general audience"}. This is a draft structure, not researched facts.`
       : `ТЕСТОВЫЙ ШАБЛОН. Тема: ${request.seed}. Подход: ${angle}. Объясните одну мысль, добавьте пример и проверьте факты. Аудитория: ${request.channel?.audience ?? "широкая аудитория"}. Это структура замысла, не исследование фактов.`,
-    genre: request.channel?.format ?? (en ? "Explainer" : "Объяснение"),
-    style: request.channel?.tone ?? (en ? "Clear and calm" : "Просто и спокойно"),
+    genre: defaults.genre || (en ? "Explainer" : "Объяснение"),
+    style: defaults.style || (en ? "Clear and calm" : "Просто и спокойно"),
   })).map(idea => ({ ...idea, topic: idea.topic.slice(0, 1200) }));
 }

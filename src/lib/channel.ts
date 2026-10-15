@@ -1,3 +1,5 @@
+import { projectLimits } from './projects/validation';
+
 export const channelLimits = {
   name: 120,
   audience: 400,
@@ -21,7 +23,15 @@ export const emptyChannel: ChannelProfile = {
 export const channelColumns =
   'name,audience,topics,tone,format,avoid,language,updated_at';
 export const channelMigrationMessage =
-  'Для профиля канала и новых роликов выполните миграцию 202610150001_channel_profiles.sql по docs/setup.md.';
+  'Для профиля канала и новых роликов выполните миграции профиля по docs/setup.md.';
+
+// Detailed channel instructions stay in the snapshot, not in short project fields.
+export function channelProjectDefaults(profile: ChannelProfile | null) {
+  return {
+    genre: profile && profile.format.length <= projectLimits.genre ? profile.format : '',
+    style: profile && profile.tone.length <= projectLimits.style ? profile.tone : '',
+  };
+}
 
 export function validateChannel(input: unknown) {
   const data =

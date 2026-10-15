@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { channelSnapshot, validateChannel, channelLimits } from "../src/lib/channel";
+import { channelSnapshot, validateChannel, channelLimits, channelProjectDefaults } from "../src/lib/channel";
 import { parseIdeas, testIdeas, validateIdeaRequest } from "../src/lib/ideas";
 import { requestYandexIdeas, requestYandexScript, requestYandexScenes } from "../src/lib/ai/yandex-client";
 import { exportText } from "../src/lib/export";
@@ -24,6 +24,15 @@ test("channel rejects missing, wrong-type, oversized fields and unsupported lang
     if (key !== "avoid") assert.equal(validateChannel({ ...profile, [key]: " " }).valid, false);
   }
   assert.equal(validateChannel({ ...profile, language: "es" }).valid, false);
+});
+
+test("detailed channel requirements fit the profile without overflowing short project fields", () => {
+  const detailed = { ...profile, tone: "t".repeat(1000), format: "f".repeat(1000), avoid: "a".repeat(1000) };
+  assert.equal(validateChannel(detailed).valid, true);
+  assert.deepEqual(channelProjectDefaults(detailed), { genre: "", style: "" });
+  assert.deepEqual(channelSnapshot(detailed), detailed);
+  assert.deepEqual(channelProjectDefaults(profile), { genre: "Explainer", style: "Calm" });
+  assert.deepEqual(channelProjectDefaults(null), { genre: "", style: "" });
 });
 
 test("idea request rejects unbounded or invalid inputs before generation", () => {

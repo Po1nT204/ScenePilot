@@ -1,4 +1,4 @@
--- Replace with two existing TEST accounts. Run after 202610150001_channel_profiles.sql.
+-- Replace with two existing TEST accounts. Run after 202610150002_channel_profile_limits.sql.
 -- Existing test-account profile edits below are rolled back with all other changes.
 begin;
 select set_config('test.user_a','REPLACE_WITH_USER_A_UUID',true);
@@ -52,6 +52,22 @@ with inserted as (
 ) select set_config('test.new_tone',channel_snapshot->>'tone',true) from inserted;
 do $$ begin
  if current_setting('test.new_tone') <> 'New tone' then raise exception 'New project did not capture changed profile'; end if;
+end $$;
+-- Regression: expanded fields accept 1000 characters, but still reject 1001.
+update public.channel_profiles set tone=repeat('t',1000),format=repeat('f',1000),avoid=repeat('a',1000)
+where owner_id=current_setting('test.user_a')::uuid;
+do $$ declare field_name text; begin
+ if not exists(select 1 from public.channel_profiles where owner_id=current_setting('test.user_a')::uuid
+  and char_length(tone)=1000 and char_length(format)=1000 and char_length(avoid)=1000) then
+  raise exception 'Expanded profile was not saved';
+ end if;
+ foreach field_name in array array['tone','format','avoid'] loop
+  begin
+   execute format('update public.channel_profiles set %I = $1 where owner_id = $2',field_name)
+    using repeat('x',1001),current_setting('test.user_a')::uuid;
+   raise exception 'Oversized profile field allowed: %',field_name;
+  exception when check_violation then null; end;
+ end loop;
 end $$;
 reset role;
 select set_config('request.jwt.claims',json_build_object('sub',current_setting('test.user_b'),'role','authenticated')::text,true);
