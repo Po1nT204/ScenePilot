@@ -1,5 +1,5 @@
 import "server-only";
-import { GenerationError, requestYandexScript, requestYandexScenes, requestYandexIdeas } from "./yandex-client";
+import { GenerationError, requestYandexScript, requestYandexScenes, requestYandexIdeas, requestYandexPublication } from "./yandex-client";
 import type { IdeaRequest } from "../ideas";
 import type { ScriptBrief } from "../scripts/test-generator";
 export function yandexReady() {
@@ -20,4 +20,7 @@ export async function generateYandexScenes(content:string,brief:ScriptBrief) {
 }
 export async function generateYandexIdeas(request: IdeaRequest) {
  return requestYandexIdeas(getYandexConfig(), request);
+}
+export async function generateYandexPublication(content: string, brief: ScriptBrief) {
+ return requestYandexPublication(getYandexConfig(),content,brief);
 }

@@ -22,7 +22,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   return <section className="video-library" aria-labelledby="library-title">
     <div className="project-heading">
       <div><p className="eyebrow">БИБЛИОТЕКА</p><h1 id="library-title" className="auth-title">Мои ролики</h1>
-        <p className="auth-description">Сценарии, сцены и экспорт — открывайте нужный материал сразу.</p></div>
+        <p className="auth-description">Сценарии, сцены, тексты публикации и экспорт — открывайте нужный материал сразу.</p></div>
       {!error && <Link className="button" href="/projects/new">+ Новый ролик</Link>}
     </div>
     {query.deleted === "1" && <p className="success-notice" role="status">Ролик и его материалы удалены.</p>}
@@ -53,8 +53,9 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                   <Link className="button" href={scriptUrl}>{version ? "Сценарий" : "Создать сценарий"}</Link>
                   {version ? <>
                     <Link className="text-button" href={`${base}/scenes?version=${version.id}`}>{sceneCount ? "Сцены" : "Создать сцены"}</Link>
+                    <Link className="text-button" href={`${base}/publication?version=${version.id}`}>Публикация</Link>
                     <Link className="text-button" href={`${base}/export?version=${version.id}`}>Экспорт</Link>
-                  </> : <p className="material-hint">Сцены и экспорт станут доступны после сохранения сценария.</p>}
+                  </> : <p className="material-hint">Сцены, тексты публикации и экспорт станут доступны после сохранения сценария.</p>}
                 </div>
               </div>
             </article>;

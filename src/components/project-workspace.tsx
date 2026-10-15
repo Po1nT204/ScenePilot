@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-type Section = "settings" | "scripts" | "scenes" | "export";
+type Section = "settings" | "scripts" | "scenes" | "publication" | "export";
 
 // Pages pass only a version already checked against the current user's project.
 export function ProjectWorkspace({ projectId, title, current, version }: {
@@ -15,6 +15,7 @@ export function ProjectWorkspace({ projectId, title, current, version }: {
     { id: "settings", label: "Настройки", href: base + query, available: true },
     { id: "scripts", label: "Сценарий", href: `${base}/scripts${query}`, available: true },
     { id: "scenes", label: "Сцены", href: `${base}/scenes${query}`, available: !!version },
+    { id: "publication", label: "Публикация", href: `${base}/publication${query}`, available: !!version },
     { id: "export", label: "Экспорт", href: `${base}/export${query}`, available: !!version },
   ];
 
@@ -30,9 +31,9 @@ export function ProjectWorkspace({ projectId, title, current, version }: {
         : <span key={section.id} aria-disabled="true" title="Сначала сохраните сценарий">{section.label}</span>)}
     </nav>
     <p className="workspace-context">{!version
-      ? "Сохраните первый сценарий, чтобы открыть сцены и экспорт."
+      ? "Сохраните первый сценарий, чтобы открыть сцены, материалы публикации и экспорт."
       : current === "settings"
         ? "Настройки общие для ролика. Их изменения попадут только в новые версии сценария."
-        : "Сцены и экспорт относятся к указанной сохранённой версии. История версий доступна в разделе «Сценарий»."}</p>
+        : "Сцены, материалы публикации и экспорт относятся к указанной сохранённой версии. История версий доступна в разделе «Сценарий»."}</p>
   </header>;
 }

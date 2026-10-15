@@ -1,4 +1,5 @@
 import { channelSnapshot, channelSummary, type ChannelProfile } from "./channel";
+import { publicationPayload, type PublicationDraft } from "./publication";
 export type ExportSnapshot = {
  title:string;topic:string;genre:string;style:string;language:string;target_duration_seconds:number;
  channel?: ChannelProfile | null; brief_source?: string;
@@ -9,6 +10,7 @@ export type ExportScene = {
 export type ExportDocument = {
  versionId:string;versionNumber:number;createdAt:string;content:string;source:string;
  snapshot:ExportSnapshot;scenes:ExportScene[];
+ publication?: (PublicationDraft & {script_version_id:string}) | null;
 };
 export type ExportFormat = "txt"|"md";
 export function sourceLabel(source:string) {
@@ -22,6 +24,9 @@ function fenced(text:string) {
 }
 export function exportText(document:ExportDocument,format:ExportFormat):string {
  if(document.scenes.some(scene=>scene.script_version_id!==document.versionId)) throw new Error("Scene version mismatch");
+ if(document.publication && document.publication.script_version_id!==document.versionId) throw new Error("Publication version mismatch");
+ const publication = document.publication ? publicationPayload(document.publication) : null;
+ if(document.publication && !publication) throw new Error("Invalid publication material");
  const scenes=[...document.scenes].sort((a,b)=>a.position-b.position);
  if(new Set(scenes.map(scene=>scene.position)).size!==scenes.length) throw new Error("Duplicate scene position");
  const heading=(level:number,text:string)=>format==="md" ? "#".repeat(level)+" "+text : text;
@@ -51,6 +56,11 @@ export function exportText(document:ExportDocument,format:ExportFormat):string {
   heading(4,"Визуальный промпт"),block(scene.visual_prompt),
   heading(4,"Текст озвучки"),block(scene.narration),
  );
+ parts.push(heading(2,"Материалы публикации версии "+document.versionNumber));
+ if(publication) {
+  parts.push("Источник: "+sourceLabel(publication.source),heading(3,"Выбранный заголовок"),block(publication.title),heading(3,"Описание ролика"),block(publication.description));
+  if(publication.titles.length) parts.push(heading(3,"Варианты заголовка"),block(publication.titles.map((title,index)=>`${index+1}. ${title}`).join("\n")));
+ } else parts.push("Материалы публикации для этой версии не сохранены.");
  return parts.join("\n\n")+"\n";
 }
 export function exportFilename(document:ExportDocument,format:ExportFormat) {

@@ -447,6 +447,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid #b35a28; outline-
 .scene-card-actions { margin: 12px 0 20px; }
 .scene-card-actions button { min-height: 44px; padding: 9px 12px; }
 .scene-card h2:focus { outline: 2px solid var(--green); outline-offset: 4px; }
+.publication-editor { margin-top: 24px; }
+.publication-variants { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: #fffefa; }
+.publication-variants h3 { margin-top: 0; }
+.publication-variants > div + div { margin-top: 18px; }
 .project-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 28px; }
 .project-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 22px; margin: 30px 0 60px; }
 .project-card { border: 1px solid var(--line); border-radius: 10px; padding: 26px; background: #fffefa; min-width: 0; }
