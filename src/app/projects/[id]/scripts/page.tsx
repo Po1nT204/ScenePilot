@@ -15,7 +15,7 @@ export default async function ScriptsPage({ params, searchParams }: { params: Pr
  const { id } = await params;
  const query = await searchParams;
  if (!isProjectId(id) || (query.version && !isProjectId(query.version))) notFound();
- const project = await supabase.from("projects").select("id,title").eq("id", id).eq("owner_id", user.id).maybeSingle();
+ const project = await supabase.from("projects").select("id,title,target_duration_seconds").eq("id", id).eq("owner_id", user.id).maybeSingle();
  if (project.error) throw new Error("Project unavailable");
  if (!project.data) notFound();
  const history = await supabase.from("script_versions").select("id,version_number,created_at").eq("project_id", id).order("version_number", { ascending: false });
@@ -36,6 +36,6 @@ export default async function ScriptsPage({ params, searchParams }: { params: Pr
   {snapshot && <details><summary>Настройки на момент сохранения версии {version?.version_number}</summary><p>{snapshot.title}: {snapshot.topic}</p><p>{snapshot.genre} · {snapshot.style} · {snapshot.language === "ru" ? "Русский" : "Английский"} · {snapshot.target_duration_seconds} сек.</p></details>}
   <p className="field-hint">Новая версия получит текущие настройки проекта. Старые версии и их настройки остаются неизменными.</p>
   <ChannelDetails value={snapshot?.channel} />
-  <ScriptEditor key={version?.id ?? "new"} projectId={id} initial={version?.content ?? ""} versionNumber={version?.version_number} initialSource={version?.source ?? "manual"} yandexEnabled={yandexReady()} />
+  <ScriptEditor key={version?.id ?? "new"} projectId={id} initial={version?.content ?? ""} versionNumber={version?.version_number} initialSource={version?.source ?? "manual"} yandexEnabled={yandexReady()} targetDuration={project.data.target_duration_seconds} versionDuration={snapshot?.target_duration_seconds} />
  </section></>;
 }

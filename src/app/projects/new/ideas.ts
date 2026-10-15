@@ -4,10 +4,11 @@ import { channelColumns, channelSnapshot, channelMigrationMessage } from "@/lib/
 import { validateIdeaRequest, testIdeas, type IdeaResult } from "@/lib/ideas";
 import { generateYandexIdeas } from "@/lib/ai/yandex";
 import { GenerationError } from "@/lib/ai/yandex-client";
+import { durationLimits } from "@/lib/duration";
 
 export async function suggestIdeas(seed: string, language: string, duration: number, profileRevision: string | null, mode: "test" | "yandex"): Promise<IdeaResult> {
   const checked = validateIdeaRequest(seed, language, duration);
-  if (!checked || !["test", "yandex"].includes(mode)) return { error: "Укажите направление до 1000 символов, язык и длительность от 1 до 300 секунд." };
+  if (!checked || !["test", "yandex"].includes(mode)) return { error: `Укажите направление до 1000 символов, язык и длительность от 1 до ${durationLimits.max} секунд.` };
   const { supabase, user } = await requireProjectUser();
   try {
     const profile = await supabase.from("channel_profiles").select(channelColumns).eq("owner_id", user.id).maybeSingle();

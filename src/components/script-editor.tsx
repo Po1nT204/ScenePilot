@@ -4,8 +4,10 @@ import { useRouter } from "next/navigation";
 import { saveScript } from "@/app/projects/[id]/scripts/actions";
 import { generateScriptExample } from "@/app/projects/[id]/scripts/generate";
 import { scriptLimit, type ScriptState } from "@/lib/scripts/validation";
+import {NarrationMeter} from "./narration-meter";
+import {supportsFullGeneration,longGenerationMessage} from "@/lib/duration";
 
-export function ScriptEditor({ projectId, initial, versionNumber, initialSource, yandexEnabled }: { projectId: string; initial: string; versionNumber?: number; initialSource:string; yandexEnabled:boolean }) {
+export function ScriptEditor({ projectId, initial, versionNumber, initialSource, yandexEnabled, targetDuration, versionDuration }: { projectId: string; initial: string; versionNumber?: number; initialSource:string; yandexEnabled:boolean; targetDuration:number; versionDuration?:number }) {
  const [content, setContent] = useState(initial);
  const [source,setSource] = useState(initialSource);
  const [generating, setGenerating] = useState(false);
@@ -18,6 +20,7 @@ export function ScriptEditor({ projectId, initial, versionNumber, initialSource,
  const busy = pending || generating;
  async function generate(mode: "test" | "yandex") {
   if (generationLock.current || pending || state.savedId) return;
+  if (mode === "yandex" && !supportsFullGeneration(targetDuration)) {setGenerationMessage(longGenerationMessage);return;}
   if (mode === "yandex" && !window.confirm("Отправить настройки проекта и сохранённые требования канала в Yandex AI Studio? Это платный запрос, максимум 2000 токенов ответа. Новый результат заменит текст редактора; сохранённые версии останутся.")) return;
   if (mode === "test" && content.trim() && !window.confirm("Заменить текст в редакторе тестовым примером? Несохранённые правки будут потеряны. Сохранённые версии останутся без изменений.")) return;
   generationLock.current = true;
@@ -61,7 +64,8 @@ export function ScriptEditor({ projectId, initial, versionNumber, initialSource,
   <section aria-label="Генерация сценария">
    <h2>Создать сценарий</h2>
    <p>{yandexEnabled ? "YandexGPT настроен. Реальный запрос оплачивается отдельно; тестовый пример бесплатный и создаётся по шаблону." : "YandexGPT пока выключен. Для подключения выполните инструкцию в README. Тестовый пример создаётся бесплатно по шаблону."}</p>
-   <button className="button" type="button" onClick={() => generate("yandex")} disabled={!yandexEnabled || busy || !!state.savedId}>Сгенерировать с YandexGPT</button>{" "}
+   {!supportsFullGeneration(targetDuration) && <p className="field-hint">{longGenerationMessage}</p>}
+   <button className="button" type="button" onClick={() => generate("yandex")} disabled={!yandexEnabled || !supportsFullGeneration(targetDuration) || busy || !!state.savedId}>Сгенерировать с YandexGPT</button>{" "}
    <button className="text-button" type="button" onClick={() => generate("test")} disabled={busy || !!state.savedId}>Получить тестовый пример</button>
    <p className="form-message" role="status">{generationMessage}</p>
   </section>
@@ -71,6 +75,8 @@ export function ScriptEditor({ projectId, initial, versionNumber, initialSource,
    <label htmlFor="script-content">Текст сценария</label>
    <textarea id="script-content" name="content" rows={18} required maxLength={scriptLimit} value={content} onChange={event => setContent(event.target.value)} aria-describedby="script-hint" />
    <p id="script-hint" className="field-hint">{content.length} / {scriptLimit} символов. {dirty ? "Есть несохранённые изменения." : ""} Черновик автоматически не сохраняется.</p>
+   {versionDuration !== undefined && versionDuration !== targetDuration && <p className="field-hint">У открытой сохранённой версии цель {versionDuration} сек. Оценка ниже использует текущую цель ролика {targetDuration} сек., которая попадёт в новую версию.</p>}
+   <NarrationMeter text={content} targetSeconds={targetDuration} targetLabel="Цель новой версии (текущие настройки ролика)" disabled={busy || !!state.savedId} />
    <button className="button" type="submit" disabled={!content.trim() || content.trim() === initial.trim()}>{pending ? "Сохраняем…" : "Сохранить новую версию"}</button>
   </fieldset>
   <p className="form-message" role="status">{state.message}</p>

@@ -21,6 +21,7 @@ export async function saveProject(projectId: string | null, _previous: ProjectSt
   const result = projectId
    ? await supabase.from("projects").update(checked.data).eq("id", projectId).eq("owner_id", user.id).select("id").maybeSingle()
    : await supabase.from("projects").insert({ ...checked.data, owner_id: user.id, brief_source: briefSource }).select("id").single();
+  if (result.error?.code === "23514" && checked.data.target_duration_seconds > 300) return {message:"База отклонила настройки длинного ролика. Проверьте применение миграции 202610150005_long_pilot_duration.sql по docs/setup.md. Поля остаются в форме.",values:checked.values};
   if (result.error) return { message: projectError(result.error.code), values: checked.values };
   if (!result.data) return { message: "Проект не найден или недоступен.", values: checked.values };
   savedId = result.data.id;

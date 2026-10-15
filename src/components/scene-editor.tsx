@@ -3,11 +3,13 @@ import { useEffect, useRef, useState } from "react";
 import { generateSceneExamples, saveScenes } from "@/app/projects/[id]/scenes/actions";
 import { addScene, moveScene, removeScene, sceneEditsPayload, type SceneEdit, type EditorScene } from "@/lib/scene-editing";
 import { sourceLabel } from "@/lib/export";
+import {NarrationMeter} from "./narration-meter";
+import {supportsFullGeneration,longGenerationMessage} from "@/lib/duration";
 
 const labels = { description: "Описание кадра", visual_prompt: "Визуальный промпт", narration: "Текст озвучки" };
 const signature = (scenes: SceneEdit[]) => JSON.stringify(scenes.map(({description,visual_prompt,narration,source}) => ({description,visual_prompt,narration,source})));
 
-export function SceneEditor({projectId,versionId,initial,yandexEnabled}: {projectId:string;versionId:string;initial:SceneEdit[];yandexEnabled:boolean}) {
+export function SceneEditor({projectId,versionId,initial,yandexEnabled,scriptContent,targetDuration}: {projectId:string;versionId:string;initial:SceneEdit[];yandexEnabled:boolean;scriptContent:string;targetDuration:number}) {
  const [scenes,setScenes] = useState<EditorScene[]>(() => initial.map((scene,index) => ({...scene,key:`saved-${index}`})));
  const [baseline,setBaseline] = useState(() => signature(initial));
  const [busy,setBusy] = useState(false);
@@ -51,6 +53,7 @@ export function SceneEditor({projectId,versionId,initial,yandexEnabled}: {projec
 
  async function run(mode:"test"|"yandex"|"save") {
   if(lock.current) return;
+  if(mode === "yandex" && !supportsFullGeneration(targetDuration)) {setMessage(longGenerationMessage);return;}
   if(mode === "save" && (!dirty || !valid)) return;
   if (mode === "save" && !scenes.length && !window.confirm("Удалить все сохранённые сцены этой версии? Сценарий и другие версии останутся без изменений. Истории сцен для восстановления нет.")) return;
   if (mode === "yandex" && !window.confirm("Отправить сохранённую версию сценария в Yandex? Это платный запрос до 4000 токенов ответа. Результат заменит редактор сцен, но сохранённый набор изменится только после сохранения.")) return;
@@ -82,11 +85,13 @@ export function SceneEditor({projectId,versionId,initial,yandexEnabled}: {projec
   <div className="scene-toolbar">
    <button type="button" id="add-scene" className="button" disabled={busy || scenes.length >= 12} onClick={add}>Добавить сцену</button>
    <button type="button" className="text-button" disabled={busy} onClick={() => run("test")}>Тестовые сцены · бесплатно</button>
-   <button type="button" className="text-button" disabled={busy || !yandexEnabled} onClick={() => run("yandex")}>Сцены YandexGPT · платно</button>
+   <button type="button" className="text-button" disabled={busy || !yandexEnabled || !supportsFullGeneration(targetDuration)} onClick={() => run("yandex")}>Сцены YandexGPT · платно</button>
   </div>
   {!yandexEnabled && <p className="field-hint">Yandex выключен или не настроен. Ручное создание и тестовые сцены доступны.</p>}
+  {!supportsFullGeneration(targetDuration) && <p className="field-hint">{longGenerationMessage}</p>}
   <p role="status" aria-live="polite">{message}</p>
   <p>{scenes.length} из 12 сцен · {dirty ? "Есть несохранённые изменения" : "Нет несохранённых изменений"}</p>
+  <NarrationMeter text={scenes.map(scene=>scene.narration).join("\n")} sourceText={scriptContent} sceneCount={scenes.length} targetSeconds={targetDuration} targetLabel="Цель сохранённой версии" disabled={busy} />
   {!scenes.length && <p>{dirty ? "Редактор пуст. Сохранение удалит прежний набор сцен этой версии." : "Сцен пока нет. Добавьте первую сцену или подготовьте тестовый набор по сценарию."}</p>}
   <form onSubmit={e => {e.preventDefault();void run("save");}} className="auth-form">
    <fieldset disabled={busy}>

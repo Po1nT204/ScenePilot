@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { suggestIdeas } from "@/app/projects/new/ideas";
 import type { ChannelProfile } from "@/lib/channel";
 import type { Idea, IdeaResult } from "@/lib/ideas";
+import {durationLimits,validDuration} from "@/lib/duration";
 
 export function IdeaAssistant({ profile, profileRevision, language, duration, yandexEnabled, disabled, onBusy, onApply }: {
   profile: ChannelProfile | null; profileRevision: string | null; language: string; duration: string;
@@ -15,8 +16,8 @@ export function IdeaAssistant({ profile, profileRevision, language, duration, ya
   const lock = useRef(false);
   async function generate(mode: "test" | "yandex") {
     if (disabled || lock.current) return;
-    if (!seed.trim() || seed.trim().length > 1000 || !/^\d+$/.test(duration) || Number(duration) < 1 || Number(duration) > 300) {
-      setMessage("Укажите направление и длительность от 1 до 300 секунд."); return;
+    if (!seed.trim() || seed.trim().length > 1000 || !/^\d+$/.test(duration) || !validDuration(Number(duration))) {
+      setMessage(`Укажите направление и длительность от 1 до ${durationLimits.max} секунд.`); return;
     }
     if (mode === "yandex" && !window.confirm("Отправить направление, язык, длительность и сохранённые требования канала в YandexGPT? Это отдельный платный запрос, до 2000 токенов ответа. Форма ролика не изменится до выбора варианта.")) return;
     lock.current = true; setBusy(true); onBusy(true);

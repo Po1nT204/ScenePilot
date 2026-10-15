@@ -18,8 +18,8 @@ test("rejects empty text and oversized input", () => {
  for (const overrides of cases) assert.equal(validateProject(form(overrides)).valid, false);
 });
 test("rejects fractional, non-numeric and out-of-range duration", () => {
- for (const duration of ["", "0", "301", "-1", "1.5", "NaN", "Infinity", "1e2"]) assert.equal(validateProject(form({ duration })).valid, false, duration);
- for (const duration of ["1", "300"]) assert.equal(validateProject(form({ duration })).valid, true);
+ for (const duration of ["", "0", "901", "-1", "1.5", "NaN", "Infinity", "1e2"]) assert.equal(validateProject(form({ duration })).valid, false, duration);
+ for (const duration of ["1", "300", "301", "480", "600", "720", "900"]) assert.equal(validateProject(form({ duration })).valid, true);
 });
 test("rejects unknown language and file payload", () => {
  assert.equal(validateProject(form({ language: "other" })).valid, false);

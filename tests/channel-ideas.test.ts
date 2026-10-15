@@ -36,7 +36,7 @@ test("detailed channel requirements fit the profile without overflowing short pr
 });
 
 test("idea request rejects unbounded or invalid inputs before generation", () => {
-  for (const args of [["", "en", 60], ["x".repeat(1001), "en", 60], ["a", "es", 60], ["a", "en", 301], ["a", "en", 1.5], ["a", "en", "60"]]) {
+  for (const args of [["", "en", 60], ["x".repeat(1001), "en", 60], ["a", "es", 60], ["a", "en", 901], ["a", "en", 1.5], ["a", "en", "60"]]) {
     assert.equal(validateIdeaRequest(...args as [unknown, unknown, unknown]), null);
   }
 });

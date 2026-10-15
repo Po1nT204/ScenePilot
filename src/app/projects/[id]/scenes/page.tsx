@@ -13,7 +13,7 @@ export default async function ScenesPage({params,searchParams}: {params:Promise<
  const {supabase,user} = await requireProjectUser();
  const project = await supabase.from("projects").select("title").eq("id",id).eq("owner_id",user.id).maybeSingle();
  if(project.error) throw new Error("Project unavailable"); if(!project.data) notFound();
- const version = await supabase.from("script_versions").select("version_number,content").eq("id",versionId).eq("project_id",id).maybeSingle();
+ const version = await supabase.from("script_versions").select("version_number,content,settings_snapshot").eq("id",versionId).eq("project_id",id).maybeSingle();
  if(version.error) throw new Error("Version unavailable"); if(!version.data) notFound();
  const result = await supabase.from("scenes").select("description,visual_prompt,narration,source").eq("script_version_id",versionId).order("position");
  const initial = result.error ? null : sceneEditsPayload(result.data);
@@ -21,6 +21,6 @@ export default async function ScenesPage({params,searchParams}: {params:Promise<
  <section className="scene-page">
   <p>Сцены относятся только к версии {version.data.version_number}. Новая версия сценария получает отдельный набор сцен.</p>
   <details><summary>Исходный сценарий версии {version.data.version_number}</summary><p className="project-full-topic">{version.data.content}</p></details>
-  {initial === null ? <p role="alert">{result.error && ["PGRST205","42P01"].includes(result.error.code) ? "Выполните миграции сцен по docs/setup.md в Supabase SQL Editor." : "Не удалось загрузить сцены. Обновите страницу позже."}</p> : <SceneEditor key={versionId} projectId={id} versionId={versionId} initial={initial} yandexEnabled={yandexReady()} />}
+  {initial === null ? <p role="alert">{result.error && ["PGRST205","42P01"].includes(result.error.code) ? "Выполните миграции сцен по docs/setup.md в Supabase SQL Editor." : "Не удалось загрузить сцены. Обновите страницу позже."}</p> : <SceneEditor key={versionId} projectId={id} versionId={versionId} initial={initial} yandexEnabled={yandexReady()} scriptContent={version.data.content} targetDuration={version.data.settings_snapshot.target_duration_seconds} />}
  </section></>;
 }

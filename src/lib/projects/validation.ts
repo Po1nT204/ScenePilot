@@ -1,3 +1,4 @@
+import { durationLimits, validDuration } from '../duration';
 export const projectLimits = { title: 120, topic: 4000, genre: 100, style: 100 } as const;
 export type ProjectValues = { title: string; topic: string; genre: string; language: string; style: string; duration: string };
 export const emptyProject: ProjectValues = { title: "", topic: "", genre: "", language: "ru", style: "", duration: "60" };
@@ -13,7 +14,7 @@ export function validateProject(formData: FormData) {
   if (!values[key] || values[key].length > max) errors[key] = "Введите от 1 до " + max + " символов.";
  }
  if (!["ru", "en"].includes(values.language)) errors.language = "Выберите русский или английский язык.";
- if (!/^\d+$/.test(values.duration) || Number(values.duration) < 1 || Number(values.duration) > 300) errors.duration = "Укажите целое число секунд от 1 до 300.";
+ if (!/^\d+$/.test(values.duration) || !validDuration(Number(values.duration))) errors.duration = `Укажите целое число секунд от 1 до ${durationLimits.max}.`;
  return { values, errors, valid: Object.keys(errors).length === 0,
   data: { title: values.title, topic: values.topic, genre: values.genre, language: values.language, style: values.style, target_duration_seconds: Number(values.duration) } };
 }

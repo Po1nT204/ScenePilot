@@ -6,6 +6,7 @@ import { emptyProject, projectLimits, type ProjectState, type ProjectValues } fr
 import { IdeaAssistant } from "./idea-assistant";
 import type { ChannelProfile } from "@/lib/channel";
 import { sourceLabel } from "@/lib/export";
+import {durationLimits,supportsFullGeneration,longGenerationMessage} from "@/lib/duration";
 const labels = { title: "Название ролика", topic: "Тема и идея", genre: "Жанр", style: "Стиль" };
 export function ProjectForm({ id = null, initial = emptyProject, navigationVersion, profile = null, profileRevision = null, yandexEnabled = false }: { id?: string | null; initial?: ProjectValues; navigationVersion?: string; profile?: ChannelProfile | null; profileRevision?: string | null; yandexEnabled?: boolean }) {
  const [state, action, pending] = useActionState(saveProject.bind(null, id), { message: "", values: initial } as ProjectState);
@@ -36,8 +37,10 @@ export function ProjectForm({ id = null, initial = emptyProject, navigationVersi
    <select id="language" name="language" value={values.language} onChange={e => change("language", e.target.value)} aria-invalid={!!state.errors?.language} aria-describedby="language-error"><option value="ru">Русский</option><option value="en">Английский</option></select>
    <p id="language-error" className="field-error">{state.errors?.language}</p>
    <label htmlFor="duration">Предполагаемая длительность, секунд</label>
-   <input id="duration" name="duration" type="number" min={1} max={300} step={1} value={values.duration} onChange={e => change("duration", e.target.value)} required aria-invalid={!!state.errors?.duration} aria-describedby="duration-hint duration-error" />
-   <p id="duration-hint" className="field-hint">От 1 до 300 секунд. Это ориентир для будущего сценария.</p>
+   <input id="duration" name="duration" type="number" min={1} max={durationLimits.max} step={1} value={values.duration} onChange={e => change("duration", e.target.value)} required aria-invalid={!!state.errors?.duration} aria-describedby="duration-hint duration-error" />
+   <div className="scene-toolbar" role="group" aria-label="Быстрый выбор длительности">{[1,5,8,10,12,15].map(minutes=><button type="button" className="text-button" key={minutes} onClick={()=>change("duration",String(minutes*60))} aria-pressed={values.duration===String(minutes*60)}>{minutes} мин</button>)}</div>
+   <p id="duration-hint" className="field-hint">От 1 до {durationLimits.max} секунд (15 минут). Это цель, а не измеренный хронометраж.</p>
+   {Number(values.duration)>durationLimits.fullGenerationMax && !supportsFullGeneration(Number(values.duration)) && <p className="field-hint">{longGenerationMessage}</p>}
    <p id="duration-error" className="field-error">{state.errors?.duration}</p>
    <button type="submit" className="button">{pending ? "Сохраняем…" : id ? "Сохранить изменения" : "Создать ролик"}</button>
   </fieldset>
