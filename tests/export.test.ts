@@ -38,3 +38,13 @@ test("download name uses version and id, not unsafe project title",()=>{
  assert.equal(exportFilename(changed,"txt"),"scenepilot-v2-12345678.txt");
  assert.equal(exportFilename(changed,"md"),"scenepilot-v2-12345678.md");
 });
+
+test("export keeps manual and generated provenance in the saved scene order",()=>{
+ const scenes=[{...document.scenes[0],source:'manual',position:1},{...document.scenes[1],position:2}];
+ for(const format of ['txt','md'] as const) {
+  const text=exportText({...document,scenes},format);
+  assert.ok(text.includes('Источник: Ручной ввод'));
+  assert.ok(text.includes('Источник: YandexGPT'));
+  assert.ok(text.indexOf('Второй кадр')<text.indexOf('Первый кадр'));
+ }
+});

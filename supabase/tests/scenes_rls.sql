@@ -1,4 +1,5 @@
 -- Replace UUIDs with two existing TEST accounts; run whole file. Changes roll back.
+-- Requires 202610150003_scene_editing.sql, including manual/mixed/empty sets.
 begin;
 select set_config('test.user_a','REPLACE_WITH_USER_A_UUID',true);
 select set_config('test.user_b','REPLACE_WITH_USER_B_UUID',true);
@@ -42,6 +43,60 @@ do $$ begin
   raise exception 'Direct insert allowed';
  exception when insufficient_privilege then null; end;
 end $$;
+-- Per-scene sources, ignored forged positions/IDs, and exact saved order.
+select public.save_scene_edits(current_setting('test.version_id')::uuid,'[
+ {"description":"Manual","visual_prompt":"M","narration":"Manual narration","source":"manual","position":99,"script_version_id":"forged"},
+ {"description":"Generated","visual_prompt":"G","narration":"Generated narration","source":"yandex"},
+ {"description":"Template","visual_prompt":"T","narration":"Template narration","source":"test"}
+]');
+select public.save_scene_edits(current_setting('test.version_2')::uuid,'[{"description":"Other version","visual_prompt":"P","narration":"Keep","source":"manual"}]');
+do $$ declare invalid_payload jsonb; begin
+ if (select array_agg(source order by position) from public.scenes where script_version_id=current_setting('test.version_id')::uuid)
+  is distinct from array['manual','yandex','test'] then raise exception 'Mixed sources lost'; end if;
+ if (select array_agg(position order by position) from public.scenes where script_version_id=current_setting('test.version_id')::uuid)
+  is distinct from array[1,2,3] then raise exception 'Invalid positions'; end if;
+ for invalid_payload in select value from jsonb_array_elements('[
+  null,{},[null],
+  [{"description":"x","visual_prompt":"x","narration":"x","source":"unknown"}],
+  [{"description":"x","visual_prompt":"x","narration":"x","source":null}],
+  [{"description":"x","visual_prompt":"x","narration":"x"}],
+  [{"description":"x","visual_prompt":"x","narration":" ","source":"manual"}]
+ ]'::jsonb) loop
+  begin
+   perform public.save_scene_edits(current_setting('test.version_id')::uuid,invalid_payload);
+   raise exception 'Invalid edit accepted';
+  exception when invalid_parameter_value then null; end;
+ end loop;
+ begin
+  perform public.save_scene_edits(current_setting('test.version_id')::uuid,
+   (select jsonb_agg(jsonb_build_object('description','x','visual_prompt','x','narration','x','source','manual')) from generate_series(1,13)));
+  raise exception 'Thirteen scenes accepted';
+ exception when invalid_parameter_value then null; end;
+ begin
+  perform public.save_scene_edits(current_setting('test.version_id')::uuid,
+   jsonb_build_array(jsonb_build_object('description',repeat('x',2001),'visual_prompt','x','narration','x','source','manual')));
+  raise exception 'Oversized field accepted';
+ exception when invalid_parameter_value then null; end;
+ if (select count(*) from public.scenes where script_version_id=current_setting('test.version_id')::uuid) <> 3 then raise exception 'Invalid edit damaged saved set'; end if;
+end $$;
+-- Delete middle scene and move template first in one save; positions become 1,2.
+select public.save_scene_edits(current_setting('test.version_id')::uuid,'[
+ {"description":"Template","visual_prompt":"T","narration":"Template narration","source":"test"},
+ {"description":"Manual","visual_prompt":"M","narration":"Manual narration","source":"manual"}
+]');
+do $$ begin
+ if (select array_agg(narration order by position) from public.scenes where script_version_id=current_setting('test.version_id')::uuid)
+  is distinct from array['Template narration','Manual narration'] then raise exception 'Reorder failed'; end if;
+ if (select array_agg(position order by position) from public.scenes where script_version_id=current_setting('test.version_id')::uuid)
+  is distinct from array[1,2] then raise exception 'Positions not contiguous'; end if;
+end $$;
+select public.save_scene_edits(current_setting('test.version_id')::uuid,'[]');
+do $$ begin
+ if exists(select 1 from public.scenes where script_version_id=current_setting('test.version_id')::uuid) then raise exception 'Empty set did not clear scenes'; end if;
+ if not exists(select 1 from public.scenes where script_version_id=current_setting('test.version_2')::uuid and narration='Keep') then raise exception 'Other version modified'; end if;
+ if not exists(select 1 from public.script_versions where id=current_setting('test.version_id')::uuid and content='First version') then raise exception 'Script modified'; end if;
+end $$;
+-- Legacy save API still works after the new migration.
 select public.save_scenes(current_setting('test.version_id')::uuid,'[{"description":"Edited","visual_prompt":"Edited","narration":"Edited"}]','yandex');
 reset role;
 select set_config('request.jwt.claims',json_build_object('sub',current_setting('test.user_b'),'role','authenticated')::text,true);
@@ -51,6 +106,14 @@ do $$ begin
  begin
   perform public.save_scenes(current_setting('test.version_id')::uuid,'[{"description":"x","visual_prompt":"x","narration":"x"}]','yandex');
   raise exception 'Foreign write allowed';
+ exception when insufficient_privilege then null; end;
+ begin
+  perform public.save_scene_edits(current_setting('test.version_id')::uuid,'[{"description":"x","visual_prompt":"x","narration":"x","source":"manual"}]');
+  raise exception 'Foreign manual write allowed';
+ exception when insufficient_privilege then null; end;
+ begin
+  perform public.save_scene_edits(current_setting('test.version_id')::uuid,'[]');
+  raise exception 'Foreign clear allowed';
  exception when insufficient_privilege then null; end;
 end $$;
 reset role;
@@ -64,6 +127,10 @@ do $$ begin
  begin
   perform public.save_scenes(current_setting('test.version_id')::uuid,'[]','yandex');
   raise exception 'Anonymous call allowed';
+ exception when insufficient_privilege then null; end;
+ begin
+  perform public.save_scene_edits(current_setting('test.version_id')::uuid,'[]');
+  raise exception 'Anonymous edit allowed';
  exception when insufficient_privilege then null; end;
 end $$;
 reset role;

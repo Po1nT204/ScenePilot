@@ -4,6 +4,7 @@ import { requireProjectUser } from "@/lib/projects/server";
 import { isProjectId } from "@/lib/projects/validation";
 import { SceneEditor } from "@/components/scene-editor";
 import { yandexReady } from "@/lib/ai/yandex";
+import { sceneEditsPayload } from "@/lib/scene-editing";
 export const dynamic = "force-dynamic";
 export const metadata = {title: "Сцены — ScenePilot"};
 export default async function ScenesPage({params,searchParams}: {params:Promise<{id:string}>;searchParams:Promise<{version?:string}>}) {
@@ -15,10 +16,11 @@ export default async function ScenesPage({params,searchParams}: {params:Promise<
  const version = await supabase.from("script_versions").select("version_number,content").eq("id",versionId).eq("project_id",id).maybeSingle();
  if(version.error) throw new Error("Version unavailable"); if(!version.data) notFound();
  const result = await supabase.from("scenes").select("description,visual_prompt,narration,source").eq("script_version_id",versionId).order("position");
+ const initial = result.error ? null : sceneEditsPayload(result.data);
  return <><ProjectWorkspace projectId={id} title={project.data.title} current="scenes" version={{ id: versionId, version_number: version.data.version_number }} />
  <section className="scene-page">
   <p>Сцены относятся только к версии {version.data.version_number}. Новая версия сценария получает отдельный набор сцен.</p>
   <details><summary>Исходный сценарий версии {version.data.version_number}</summary><p className="project-full-topic">{version.data.content}</p></details>
-  {result.error ? <p role="alert">{["PGRST205","42P01"].includes(result.error.code) ? "Выполните миграцию 202610130002_create_scenes.sql из README в Supabase SQL Editor." : "Не удалось загрузить сцены. Обновите страницу позже."}</p> : <SceneEditor key={versionId} projectId={id} versionId={versionId} initial={result.data.map(({description,visual_prompt,narration})=>({description,visual_prompt,narration}))} initialSource={result.data[0]?.source === "yandex" ? "yandex" : "test"} yandexEnabled={yandexReady()} />}
+  {initial === null ? <p role="alert">{result.error && ["PGRST205","42P01"].includes(result.error.code) ? "Выполните миграции сцен по docs/setup.md в Supabase SQL Editor." : "Не удалось загрузить сцены. Обновите страницу позже."}</p> : <SceneEditor key={versionId} projectId={id} versionId={versionId} initial={initial} yandexEnabled={yandexReady()} />}
  </section></>;
 }

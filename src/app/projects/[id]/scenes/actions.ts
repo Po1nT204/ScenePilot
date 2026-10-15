@@ -5,6 +5,7 @@ import { isProjectId } from "@/lib/projects/validation";
 import { testScenes, validScenes, type SceneDraft } from "@/lib/scenes";
 import {generateYandexScenes} from "@/lib/ai/yandex";
 import {GenerationError} from "@/lib/ai/yandex-client";
+import { sceneEditsPayload } from "@/lib/scene-editing";
 async function ownedVersion(projectId: string, versionId: string) {
  const { supabase, user } = await requireProjectUser();
  if (!isProjectId(projectId) || !isProjectId(versionId)) throw new Error("Invalid id");
@@ -28,14 +29,15 @@ export async function generateSceneExamples(projectId: string, versionId: string
   return { scenes, error: "" };
  } catch(error) { return { scenes: null, error: error instanceof GenerationError ? error.message : "Не удалось получить сцены. Проверьте соединение и доступ к версии. Текущий набор не изменён." }; }
 }
-export async function saveScenes(projectId: string, versionId: string, scenes: unknown, source:"test"|"yandex"="test") {
- if(source!=="test" && source!=="yandex") return {error:"Неизвестный источник сцен."};
- if (!validScenes(scenes)) return { error: "Нужны 1–12 сцен. Каждое поле должно содержать от 1 до 2000 символов." };
+export async function saveScenes(projectId: string, versionId: string, scenes: unknown) {
+ const payload = sceneEditsPayload(scenes);
+ if (!payload) return { error: "Допустимо до 12 сцен с указанным источником. Каждое поле должно содержать от 1 до 2000 символов." };
  try {
   const { supabase } = await ownedVersion(projectId,versionId);
-  const { error } = await supabase.rpc("save_scenes", { p_version_id: versionId, p_source:source, p_scenes: scenes.map(({description,visual_prompt,narration}) => ({description,visual_prompt,narration})) });
-  if (error) return { error: error.code === "PGRST202" ? "Выполните миграцию 202610130004_yandex_scenes.sql из README. Правки остаются в редакторе." : "Не удалось сохранить сцены. Правки остаются в редакторе; проверьте сохранённый набор перед повтором." };
+  const { error } = await supabase.rpc("save_scene_edits", { p_version_id: versionId, p_scenes: payload });
+  if (error) return { error: error.code === "PGRST202" ? "Выполните миграцию 202610150003_scene_editing.sql по docs/setup.md. Правки остаются в редакторе." : "Не удалось сохранить сцены. Правки остаются в редакторе; проверьте сохранённый набор перед повтором." };
   revalidatePath(`/projects/${projectId}/scenes`);
+  revalidatePath(`/projects/${projectId}/export`);
   revalidatePath("/projects");
   return { error: "" };
  } catch { return { error: "Соединение прервано или версия недоступна. Правки остаются в редакторе." }; }
