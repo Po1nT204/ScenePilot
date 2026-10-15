@@ -1,5 +1,6 @@
 import "server-only";
-import { GenerationError, requestYandexScript, requestYandexScenes } from "./yandex-client";
+import { GenerationError, requestYandexScript, requestYandexScenes, requestYandexIdeas } from "./yandex-client";
+import type { IdeaRequest } from "../ideas";
 import type { ScriptBrief } from "../scripts/test-generator";
 export function yandexReady() {
  return process.env.YANDEX_GENERATION_ENABLED === "true" && !!process.env.YANDEX_API_KEY?.trim() && /^[a-zA-Z0-9_-]+$/.test(process.env.YANDEX_FOLDER_ID ?? "");
@@ -16,4 +17,7 @@ export async function generateYandexScript(brief: ScriptBrief) {
 }
 export async function generateYandexScenes(content:string,brief:ScriptBrief) {
  return requestYandexScenes(getYandexConfig(),content,brief);
+}
+export async function generateYandexIdeas(request: IdeaRequest) {
+ return requestYandexIdeas(getYandexConfig(), request);
 }

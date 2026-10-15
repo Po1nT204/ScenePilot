@@ -1,5 +1,7 @@
+import { channelSnapshot, channelSummary, type ChannelProfile } from "./channel";
 export type ExportSnapshot = {
  title:string;topic:string;genre:string;style:string;language:string;target_duration_seconds:number;
+ channel?: ChannelProfile | null; brief_source?: string;
 };
 export type ExportScene = {
  script_version_id:string;position:number;description:string;visual_prompt:string;narration:string;source:string;
@@ -25,12 +27,15 @@ export function exportText(document:ExportDocument,format:ExportFormat):string {
  const heading=(level:number,text:string)=>format==="md" ? "#".repeat(level)+" "+text : text;
  const block=(text:string)=>format==="md" ? fenced(text) : text;
  const settings=document.snapshot;
+ const channel=channelSnapshot(settings.channel);
  const metadata=[
   "Название: "+settings.title,"Тема: "+settings.topic,"Жанр: "+settings.genre,"Стиль: "+settings.style,
   "Язык: "+(settings.language==="ru"?"Русский":settings.language==="en"?"Английский":settings.language),
   "Целевая длительность: "+settings.target_duration_seconds+" сек.",
   "Версия: "+document.versionNumber,"ID версии: "+document.versionId,
   "Создана: "+document.createdAt,"Источник сценария: "+sourceLabel(document.source),
+  ...(settings.brief_source ? ["Источник замысла: "+sourceLabel(settings.brief_source)] : []),
+  ...(channel ? ["Требования канала на момент создания ролика:\n"+channelSummary(channel)] : []),
  ].join("\n");
  const parts=[
   heading(1,"ScenePilot — версия "+document.versionNumber),

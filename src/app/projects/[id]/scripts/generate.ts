@@ -12,14 +12,14 @@ export async function generateScriptExample(projectId: string, mode: "test" | "y
  const { supabase, user } = await requireProjectUser();
  try {
   const { data, error } = await supabase.from("projects")
-   .select("title,topic,genre,style,language,target_duration_seconds")
+   .select("title,topic,genre,style,language,target_duration_seconds,channel_snapshot")
    .eq("id", projectId).eq("owner_id", user.id).maybeSingle();
   if (error) return { error: "Не удалось загрузить настройки проекта. Текст в редакторе не изменён." };
   if (!data) return { error: "Проект не найден или недоступен." };
   if (mode === "yandex") {
    const schema = await supabase.from("script_versions").select("source").eq("project_id",projectId).limit(1);
    if (schema.error) return {error:"Перед платной генерацией выполните миграцию источника сценария и проверьте доступность базы."};
-   return await generateYandexScript(data);
+   return await generateYandexScript({ ...data, channel: data.channel_snapshot });
   }
   const checked = validateScript(generateTestScript(data));
   if (checked.error) return { error: "Тестовый ответ не прошёл проверку. Текст в редакторе не изменён." };

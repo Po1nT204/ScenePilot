@@ -18,7 +18,7 @@ export function ScriptEditor({ projectId, initial, versionNumber, initialSource,
  const busy = pending || generating;
  async function generate(mode: "test" | "yandex") {
   if (generationLock.current || pending || state.savedId) return;
-  if (mode === "yandex" && !window.confirm("Отправить настройки проекта в Yandex AI Studio? Это платный запрос, максимум 2000 токенов ответа. Новый результат заменит текст редактора; сохранённые версии останутся.")) return;
+  if (mode === "yandex" && !window.confirm("Отправить настройки проекта и сохранённые требования канала в Yandex AI Studio? Это платный запрос, максимум 2000 токенов ответа. Новый результат заменит текст редактора; сохранённые версии останутся.")) return;
   if (mode === "test" && content.trim() && !window.confirm("Заменить текст в редакторе тестовым примером? Несохранённые правки будут потеряны. Сохранённые версии останутся без изменений.")) return;
   generationLock.current = true;
   setGenerating(true);

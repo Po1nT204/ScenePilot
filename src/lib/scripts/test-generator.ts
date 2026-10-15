@@ -1,3 +1,4 @@
+import type { ChannelProfile } from "../channel";
 export type ScriptBrief = {
  title: string;
  topic: string;
@@ -5,6 +6,7 @@ export type ScriptBrief = {
  style: string;
  language: string;
  target_duration_seconds: number;
+ channel?: ChannelProfile | null;
 };
 
 // A deterministic fixture for testing the workflow, not a language model.

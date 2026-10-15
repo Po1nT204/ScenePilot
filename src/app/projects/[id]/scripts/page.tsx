@@ -4,6 +4,8 @@ import { requireProjectUser } from "@/lib/projects/server";
 import { isProjectId } from "@/lib/projects/validation";
 import { ScriptEditor } from "@/components/script-editor";
 import { ProjectWorkspace } from "@/components/project-workspace";
+import { ChannelDetails } from "@/components/channel-details";
+import type { ChannelProfile } from "@/lib/channel";
 import { yandexReady } from "@/lib/ai/yandex";
 
 export const metadata = { title: "Сценарий — ScenePilot" };
@@ -24,7 +26,7 @@ export default async function ScriptsPage({ params, searchParams }: { params: Pr
  if (selected?.error) throw new Error("Script unavailable");
  if (selectedId && !selected?.data) notFound();
  const version = selected?.data;
- const snapshot = version?.settings_snapshot as { title: string; topic: string; genre: string; style: string; language: string; target_duration_seconds: number } | undefined;
+ const snapshot = version?.settings_snapshot as { title: string; topic: string; genre: string; style: string; language: string; target_duration_seconds: number; channel?: ChannelProfile | null } | undefined;
  return <><ProjectWorkspace projectId={id} title={project.data.title} current="scripts" version={version} />
  <section className="project-editor">
   {query.saved === "1" && <p className="success-notice" role="status">Версия сохранена.</p>}
@@ -33,6 +35,7 @@ export default async function ScriptsPage({ params, searchParams }: { params: Pr
   </details>
   {snapshot && <details><summary>Настройки на момент сохранения версии {version?.version_number}</summary><p>{snapshot.title}: {snapshot.topic}</p><p>{snapshot.genre} · {snapshot.style} · {snapshot.language === "ru" ? "Русский" : "Английский"} · {snapshot.target_duration_seconds} сек.</p></details>}
   <p className="field-hint">Новая версия получит текущие настройки проекта. Старые версии и их настройки остаются неизменными.</p>
+  <ChannelDetails value={snapshot?.channel} />
   <ScriptEditor key={version?.id ?? "new"} projectId={id} initial={version?.content ?? ""} versionNumber={version?.version_number} initialSource={version?.source ?? "manual"} yandexEnabled={yandexReady()} />
  </section></>;
 }
