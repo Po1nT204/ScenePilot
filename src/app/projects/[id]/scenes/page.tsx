@@ -19,8 +19,7 @@ export default async function ScenesPage({params,searchParams}: {params:Promise<
  const initial = result.error ? null : sceneEditsPayload(result.data);
  return <><ProjectWorkspace projectId={id} title={project.data.title} current="scenes" version={{ id: versionId, version_number: version.data.version_number }} />
  <section className="scene-page">
-  <p>Сцены относятся только к версии {version.data.version_number}. Новая версия сценария получает отдельный набор сцен.</p>
-  <details><summary>Исходный сценарий версии {version.data.version_number}</summary><p className="project-full-topic">{version.data.content}</p></details>
+  <details className="editor-help"><summary>Исходный сценарий версии {version.data.version_number}</summary><p className="project-full-topic">{version.data.content}</p></details>
   {initial === null ? <p role="alert">{result.error && ["PGRST205","42P01"].includes(result.error.code) ? "Выполните миграции сцен по docs/setup.md в Supabase SQL Editor." : "Не удалось загрузить сцены. Обновите страницу позже."}</p> : <SceneEditor key={versionId} projectId={id} versionId={versionId} initial={initial} yandexEnabled={yandexReady()} scriptContent={version.data.content} targetDuration={version.data.settings_snapshot.target_duration_seconds} />}
  </section></>;
 }

@@ -6,6 +6,7 @@ import { generateScriptExample } from "@/app/projects/[id]/scripts/generate";
 import { scriptLimit, type ScriptState } from "@/lib/scripts/validation";
 import {NarrationMeter} from "./narration-meter";
 import {supportsFullGeneration,longGenerationMessage} from "@/lib/duration";
+import {sourceLabel} from "@/lib/export";
 
 export function ScriptEditor({ projectId, initial, versionNumber, initialSource, yandexEnabled, targetDuration, versionDuration }: { projectId: string; initial: string; versionNumber?: number; initialSource:string; yandexEnabled:boolean; targetDuration:number; versionDuration?:number }) {
  const [content, setContent] = useState(initial);
@@ -59,26 +60,33 @@ export function ScriptEditor({ projectId, initial, versionNumber, initialSource,
   document.addEventListener("click", click, true);
   return () => { window.removeEventListener("beforeunload", beforeUnload); document.removeEventListener("click", click, true); };
  }, [dirty, busy]);
- return <form action={action} className="auth-form project-form">
-  <p>{versionNumber ? `Открыта версия ${versionNumber}. Сохранение создаст новую версию.` : "Введите первый сценарий или получите тестовый пример."}</p>
-  <section aria-label="Генерация сценария">
-   <h2>Создать сценарий</h2>
-   <p>{yandexEnabled ? "YandexGPT настроен. Реальный запрос оплачивается отдельно; тестовый пример бесплатный и создаётся по шаблону." : "YandexGPT пока выключен. Для подключения выполните инструкцию в README. Тестовый пример создаётся бесплатно по шаблону."}</p>
-   {!supportsFullGeneration(targetDuration) && <p className="field-hint">{longGenerationMessage}</p>}
-   <button className="button" type="button" onClick={() => generate("yandex")} disabled={!yandexEnabled || !supportsFullGeneration(targetDuration) || busy || !!state.savedId}>Сгенерировать с YandexGPT</button>{" "}
-   <button className="text-button" type="button" onClick={() => generate("test")} disabled={busy || !!state.savedId}>Получить тестовый пример</button>
-   <p className="form-message" role="status">{generationMessage}</p>
-  </section>
+ return <form action={action} className="auth-form project-form material-editor">
+  <div className="editor-actions" aria-label="Действия со сценарием">
+   <button className="button" type="submit" disabled={busy || !!state.savedId || !content.trim() || content.trim() === initial.trim()}>{pending ? "Сохраняем…" : "Сохранить новую версию"}</button>
+   <button className="text-button" type="button" onClick={() => generate("yandex")} disabled={!yandexEnabled || !supportsFullGeneration(targetDuration) || busy || !!state.savedId}>YandexGPT · платно</button>
+   <button className="text-button" type="button" onClick={() => generate("test")} disabled={busy || !!state.savedId}>Тестовый пример · бесплатно</button>
+  </div>
+  {!yandexEnabled && <p className="editor-note">YandexGPT выключен или не настроен.</p>}
+  {!supportsFullGeneration(targetDuration) && <p className="editor-note">Для цели свыше 5 минут генерация сценария Yandex пока недоступна. Можно ввести текст вручную.</p>}
+  <p className="form-message" role="status">{generationMessage}</p>
+  <p className="form-message" role="status">{state.message}</p>
+  <div className="editor-meta">
+   <p role="status">{pending ? "Сохраняем…" : generating ? "Генерация…" : state.savedId ? "Версия сохранена" : dirty ? "Есть несохранённые изменения" : versionNumber ? `Версия ${versionNumber} · Сохранено` : "Новый сценарий · Не сохранён"}</p>
+   <p>Источник: {sourceLabel(source)}</p>
+  </div>
   <fieldset disabled={busy || !!state.savedId}>
    <input type="hidden" name="source" value={source} />
-   <p>Источник: {({manual:"ручной ввод",test:"тестовый шаблон",yandex:"YandexGPT",unknown:"не зафиксирован (старая версия)"} as Record<string,string>)[source]}. Ручная правка сохраняет отметку исходного материала.</p>
    <label htmlFor="script-content">Текст сценария</label>
    <textarea id="script-content" name="content" rows={18} required maxLength={scriptLimit} value={content} onChange={event => setContent(event.target.value)} aria-describedby="script-hint" />
-   <p id="script-hint" className="field-hint">{content.length} / {scriptLimit} символов. {dirty ? "Есть несохранённые изменения." : ""} Черновик автоматически не сохраняется.</p>
-   {versionDuration !== undefined && versionDuration !== targetDuration && <p className="field-hint">У открытой сохранённой версии цель {versionDuration} сек. Оценка ниже использует текущую цель ролика {targetDuration} сек., которая попадёт в новую версию.</p>}
-   <NarrationMeter text={content} targetSeconds={targetDuration} targetLabel="Цель новой версии (текущие настройки ролика)" disabled={busy || !!state.savedId} />
-   <button className="button" type="submit" disabled={!content.trim() || content.trim() === initial.trim()}>{pending ? "Сохраняем…" : "Сохранить новую версию"}</button>
+   <p id="script-hint" className="editor-note">{content.length} / {scriptLimit} символов · Без автосохранения</p>
+   {versionDuration !== undefined && versionDuration !== targetDuration && <p className="editor-note">Цель открытой версии: {versionDuration} сек. Для новой версии и оценки: {targetDuration} сек.</p>}
+   <NarrationMeter text={content} targetSeconds={targetDuration} targetLabel="Цель новой версии" disabled={busy || !!state.savedId} />
   </fieldset>
-  <p className="form-message" role="status">{state.message}</p>
+  <details className="editor-help">
+   <summary>О версиях и генерации</summary>
+   <p>Сохранение создаёт новую версию с текущими настройками проекта. Старые тексты и снимки настроек не меняются. Черновик автоматически не сохраняется.</p>
+   <p>Тестовый пример — бесплатный шаблон. YandexGPT — отдельный платный запрос с подтверждением; сохранение не вызывает модель повторно. Подключение описано в README.</p>
+   <p>Генерация заменяет текст редактора после подтверждения. Ручные правки сохраняют источник исходного материала.</p>
+  </details>
  </form>;
 }

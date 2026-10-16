@@ -33,9 +33,7 @@ export default async function ScriptsPage({ params, searchParams }: { params: Pr
   <details className="version-history"><summary>История версий ({history.data.length})</summary>
    {history.data.length ? <ul>{history.data.map(item => <li key={item.id}><Link href={`/projects/${id}/scripts?version=${item.id}`} aria-current={selectedId === item.id ? "page" : undefined}>Версия {item.version_number}{selectedId === item.id ? " — открыта" : ""}</Link><time dateTime={item.created_at}>{new Intl.DateTimeFormat("ru-RU", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Yekaterinburg" }).format(new Date(item.created_at))} UTC+5</time></li>)}</ul> : <p>Сохранённых версий пока нет.</p>}
   </details>
-  {snapshot && <details><summary>Настройки на момент сохранения версии {version?.version_number}</summary><p>{snapshot.title}: {snapshot.topic}</p><p>{snapshot.genre} · {snapshot.style} · {snapshot.language === "ru" ? "Русский" : "Английский"} · {snapshot.target_duration_seconds} сек.</p></details>}
-  <p className="field-hint">Новая версия получит текущие настройки проекта. Старые версии и их настройки остаются неизменными.</p>
-  <ChannelDetails value={snapshot?.channel} />
   <ScriptEditor key={version?.id ?? "new"} projectId={id} initial={version?.content ?? ""} versionNumber={version?.version_number} initialSource={version?.source ?? "manual"} yandexEnabled={yandexReady()} targetDuration={project.data.target_duration_seconds} versionDuration={snapshot?.target_duration_seconds} />
+  {snapshot && <details className="editor-help"><summary>Настройки сохранённой версии {version?.version_number}</summary><p>{snapshot.title}: {snapshot.topic}</p><p>{snapshot.genre} · {snapshot.style} · {snapshot.language === "ru" ? "Русский" : "Английский"} · {snapshot.target_duration_seconds} сек.</p><ChannelDetails value={snapshot.channel} /></details>}
  </section></>;
 }

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { generateSceneExamples, saveScenes } from "@/app/projects/[id]/scenes/actions";
 import { addScene, moveScene, removeScene, sceneEditsPayload, type SceneEdit, type EditorScene } from "@/lib/scene-editing";
 import { sourceLabel } from "@/lib/export";
@@ -15,6 +15,7 @@ export function SceneEditor({projectId,versionId,initial,yandexEnabled,scriptCon
  const [busy,setBusy] = useState(false);
  const [message,setMessage] = useState("");
  const lock = useRef(false);
+ const formId = useId();
  const dirty = signature(scenes) !== baseline;
  const valid = sceneEditsPayload(scenes) !== null;
 
@@ -80,24 +81,26 @@ export function SceneEditor({projectId,versionId,initial,yandexEnabled,scriptCon
   finally {lock.current=false;setBusy(false);}
  }
 
- return <div className="scene-workspace">
-  <div className="success-notice"><strong>Раскадровка выбранной версии</strong><p>Добавляйте сцены вручную или получите набор генерацией. Источник указан на каждой карточке и сохраняется при правках и перестановке. Изменения применяются после сохранения.</p></div>
-  <div className="scene-toolbar">
-   <button type="button" id="add-scene" className="button" disabled={busy || scenes.length >= 12} onClick={add}>Добавить сцену</button>
+ return <div className="scene-workspace material-editor">
+  <div className="scene-toolbar editor-actions" aria-label="Действия со сценами">
+   <button className="button" form={formId} type="submit" disabled={busy || !dirty || !valid}>{busy ? "Выполняем запрос…" : "Сохранить сцены"}</button>
+   <button type="button" id="add-scene" className="text-button" disabled={busy || scenes.length >= 12} onClick={add}>Добавить сцену</button>
    <button type="button" className="text-button" disabled={busy} onClick={() => run("test")}>Тестовые сцены · бесплатно</button>
    <button type="button" className="text-button" disabled={busy || !yandexEnabled || !supportsFullGeneration(targetDuration)} onClick={() => run("yandex")}>Сцены YandexGPT · платно</button>
   </div>
-  {!yandexEnabled && <p className="field-hint">Yandex выключен или не настроен. Ручное создание и тестовые сцены доступны.</p>}
-  {!supportsFullGeneration(targetDuration) && <p className="field-hint">{longGenerationMessage}</p>}
-  <p role="status" aria-live="polite">{message}</p>
-  <p>{scenes.length} из 12 сцен · {dirty ? "Есть несохранённые изменения" : "Нет несохранённых изменений"}</p>
+  {!yandexEnabled && <p className="editor-note">YandexGPT выключен или не настроен.</p>}
+  {!supportsFullGeneration(targetDuration) && <p className="editor-note">Для цели свыше 5 минут сцены Yandex пока недоступны. Можно добавить их вручную или использовать бесплатное разбиение.</p>}
+  <p className="form-message" role="status">{message}</p>
+  <p className="editor-note" role="status">{scenes.length} / 12 сцен · {dirty ? "Есть несохранённые изменения" : scenes.length ? "Сохранено" : "Нет сохранённых сцен"} · Без автосохранения</p>
   <NarrationMeter text={scenes.map(scene=>scene.narration).join("\n")} sourceText={scriptContent} sceneCount={scenes.length} targetSeconds={targetDuration} targetLabel="Цель сохранённой версии" disabled={busy} />
   {!scenes.length && <p>{dirty ? "Редактор пуст. Сохранение удалит прежний набор сцен этой версии." : "Сцен пока нет. Добавьте первую сцену или подготовьте тестовый набор по сценарию."}</p>}
-  <form onSubmit={e => {e.preventDefault();void run("save");}} className="auth-form">
+  <form id={formId} onSubmit={e => {e.preventDefault();void run("save");}} className="auth-form">
    <fieldset disabled={busy}>
     <div className="scene-grid">{scenes.map((scene,index) => <section className="scene-card project-form" key={scene.key} aria-labelledby={`scene-${scene.key}-heading`}>
-     <h2 className="eyebrow" id={`scene-${scene.key}-heading`} tabIndex={-1}>СЦЕНА {String(index+1).padStart(2,"0")}</h2>
-     <p className="field-hint">Источник: {sourceLabel(scene.source)}</p>
+     <div className="scene-card-heading">
+      <h2 className="eyebrow" id={`scene-${scene.key}-heading`} tabIndex={-1}>СЦЕНА {String(index+1).padStart(2,"0")}</h2>
+      <p className="editor-note">Источник: {sourceLabel(scene.source)}</p>
+     </div>
      <div className="scene-card-actions">
       <button type="button" className="text-button" disabled={index === 0} aria-label={`Переместить сцену ${index+1} вверх`} onClick={() => move(scene.key,-1)}>↑ Выше</button>
       <button type="button" className="text-button" disabled={index === scenes.length-1} aria-label={`Переместить сцену ${index+1} вниз`} onClick={() => move(scene.key,1)}>↓ Ниже</button>
@@ -109,8 +112,14 @@ export function SceneEditor({projectId,versionId,initial,yandexEnabled,scriptCon
      </div>)}
     </section>)}</div>
     {dirty && !valid && <p className="field-hint">Перед сохранением заполните все три поля каждой сцены: от 1 до 2000 символов.</p>}
-    <button className="button" disabled={!dirty || !valid} type="submit">{busy ? "Выполняем запрос…" : "Сохранить сцены"}</button>
+    {scenes.length > 2 && <button className="button" disabled={!dirty || !valid} type="submit">{busy ? "Выполняем запрос…" : "Сохранить сцены"}</button>}
    </fieldset>
   </form>
+  <details className="editor-help">
+   <summary>О сценах и сохранении</summary>
+   <p>Добавление, порядок и удаление меняют черновик. «Сохранить сцены» применяет весь набор только к выбранной версии. Новая версия сценария получает отдельный набор сцен. Истории правок сцен нет.</p>
+   <p>Каждая сцена содержит описание кадра, визуальный промпт и озвучку — до 2000 символов на поле. Источник сохраняется при ручной правке и перестановке.</p>
+   <p>Тестовые сцены — бесплатное механическое разбиение. YandexGPT — отдельный платный запрос с подтверждением. Сохранение не вызывает модель повторно. Подключение описано в README.</p>
+  </details>
  </div>;
 }

@@ -10,16 +10,23 @@ export function NarrationMeter({text,targetSeconds,targetLabel,sourceText,sceneC
  const estimate=valid ? estimateNarration(text,targetSeconds,number) : null;
  const comparison=sourceText !== undefined ? compareNarration(sourceText,text) : null;
  return <section className="narration-meter" aria-label="Оценка озвучки">
-  <h3>Оценка озвучки</h3>
-  <p>{targetLabel}: {formatDuration(targetSeconds)}.</p>
+  <div className="narration-summary">
+   <p><strong>Озвучка: {estimate ? `≈ ${formatDuration(estimate.seconds)} · ${estimate.words} слов` : 'укажите темп'}</strong></p>
+   <p>{targetLabel}: {formatDuration(targetSeconds)}</p>
+   {estimate && <p className={estimate.fit==='short'||estimate.fit==='long' ? 'timing-warning' : ''}>{({empty:'Нет текста для оценки',short:'Короче цели',long:'Длиннее цели',near:'Близко к цели (±20%)'} as const)[estimate.fit]}</p>}
+  </div>
+  {!valid && <p className="form-message" role="status">Укажите целый темп от {narrationPace.min} до {narrationPace.max} в разделе «Темп и расчёт».</p>}
+  {comparison && !!sceneCount && <p className={`narration-comparison${comparison.matches ? '' : ' timing-warning'}`}>{comparison.matches ? 'Озвучка совпадает со сценарием (без учёта пробелов).' : 'Озвучка отличается от сценария: проверьте пропуски, повторы и порядок.'}</p>}
+  <details className="editor-help">
+   <summary>Темп и расчёт · {valid ? `${pace} слов/мин` : 'укажите темп'}</summary>
   <label htmlFor={id}>Темп чтения, слов в минуту</label>
   <input id={id} type="text" inputMode="numeric" value={pace} disabled={disabled} onChange={e=>setPace(e.target.value)} aria-describedby={`${id}-hint`} aria-invalid={!valid} />
   <p className="field-hint" id={`${id}-hint`}>Условный темп для планирования: {narrationPace.min}–{narrationPace.max}. Настройка действует только на этом экране и не сохраняется. Паузы, музыка и скорость диктора не учтены; заголовки и инструкции тоже считаются словами.</p>
-  {!estimate ? <p>Укажите целый темп от {narrationPace.min} до {narrationPace.max}.</p> : <>
-   <p><strong>{estimate.words} слов · примерно {formatDuration(estimate.seconds)}</strong>. Для цели при этом темпе — около {estimate.targetWords} слов.</p>
-   <p>{({empty:'Добавьте текст озвучки для оценки.',short:'Текущий текст заметно короче цели при выбранном темпе.',long:'Текущий текст заметно длиннее цели при выбранном темпе.',near:'Объём близок к цели при выбранном темпе (в пределах ±20%).'} as const)[estimate.fit]}</p>
+  {estimate && <>
+   <p>Для цели при этом темпе — около {estimate.targetWords} слов. «Короче» или «длиннее» означает отклонение больше 20%.</p>
    {sceneCount !== undefined && sceneCount > 0 && <p>{sceneCount} сцен · в среднем около {formatDuration(estimate.seconds/sceneCount)} озвучки на сцену. Реальные сцены могут быть разной длины.</p>}
   </>}
-  {comparison && <p>{!sceneCount ? 'Добавьте сцены, чтобы сравнить озвучку со сценарием.' : comparison.matches ? 'Озвучка сцен совпадает со сценарием без учёта пробелов и переносов строк.' : 'Озвучка сцен отличается от сохранённого сценария. Проверьте пропуски, повторы и порядок.'} Сценарий: {comparison.scriptWords} слов; сцены: {comparison.narrationWords}. Это сравнение текста, а не проверка смысла.</p>}
+  {comparison && <p>Сценарий: {comparison.scriptWords} слов; сцены: {comparison.narrationWords}. Сравнение игнорирует пробелы и переносы строк; это проверка текста, а не смысла.</p>}
+  </details>
  </section>;
 }

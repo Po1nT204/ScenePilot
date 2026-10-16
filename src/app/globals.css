@@ -451,9 +451,25 @@ button:focus-visible, input:focus-visible { outline: 3px solid #b35a28; outline-
 .publication-variants { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: #fffefa; }
 .publication-variants h3 { margin-top: 0; }
 .publication-variants > div + div { margin-top: 18px; }
-.narration-meter { margin: 20px 0; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: #fffefa; }
-.narration-meter h3 { margin-top: 0; }
+.narration-meter { margin: 14px 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: #fffefa; font-size: 13px; line-height: 1.6; }
+.narration-summary { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; }
+.narration-summary p { margin: 0; }
+.narration-comparison { margin: 6px 0 0; }
+.timing-warning { color: #873c2c; }
+.narration-meter .editor-help { border: 0; padding: 0; margin: 8px 0 0; }
 .narration-meter input { display: block; width: 120px; max-width: 100%; margin-top: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 6px; }
+.editor-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 14px 0; }
+.editor-actions .button, .editor-actions .text-button { min-height: 44px; margin: 0; padding: 11px 14px; font-size: 14px; }
+.editor-meta { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 14px 0 8px; font-size: 13px; line-height: 1.6; }
+.editor-meta p { margin: 0; }
+.editor-note { margin: 8px 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.material-editor fieldset { margin-top: 12px; min-width: 0; }
+.material-editor #script-content { margin-bottom: 0; line-height: 1.65; }
+.editor-help { margin: 14px 0; padding: 12px 0; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+.editor-help summary { cursor: pointer; }
+.editor-help p:last-child { margin-bottom: 0; }
+.scene-card-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+.scene-card-heading h2, .scene-card-heading p { margin: 0; }
 .project-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 28px; }
 .project-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 22px; margin: 30px 0 60px; }
 .project-card { border: 1px solid var(--line); border-radius: 10px; padding: 26px; background: #fffefa; min-width: 0; }
