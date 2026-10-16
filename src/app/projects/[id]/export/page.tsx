@@ -4,7 +4,7 @@ import {requireProjectUser} from "@/lib/projects/server";
 import {isProjectId} from "@/lib/projects/validation";
 import {ExportPanel} from "@/components/export-panel";
 import {ProjectWorkspace} from "@/components/project-workspace";
-import {sourceLabel,type ExportSnapshot} from "@/lib/export";
+import {type ExportSnapshot} from "@/lib/export";
 import {publicationColumns,publicationPayload,publicationMigrationMessage} from "@/lib/publication";
 export const dynamic="force-dynamic";
 export const metadata={title:"Экспорт — ScenePilot"};
@@ -30,8 +30,7 @@ export default async function ExportPage({params,searchParams}:{params:Promise<{
  <section className="project-editor">
   <h2>Экспорт материалов</h2>
   {snapshot.title !== project.data.title && <p>Название в сохранённой версии: {snapshot.title}</p>}
-  <p>Версия {saved.version_number} · {sourceLabel(saved.source)} · Сохранённых сцен: {scenes.data.length}</p>
-  <p className="success-notice">Выгружаются сохранённый сценарий, его настройки, сцены и материалы публикации этой версии. Несохранённые правки в файл не входят. Если материалы изменились в другой вкладке, обновите эту страницу.</p>
-  <ExportPanel document={{versionId:saved.id,versionNumber:saved.version_number,createdAt:saved.created_at,content:saved.content,source:saved.source,snapshot,scenes:scenes.data,publication:material ? {...material,script_version_id:versionId} : null}} />
+  <p>Только сохранённые данные. Правки из редакторов не включены; после изменений в другой вкладке обновите страницу. Полные сведения об источниках — в архиве.</p>
+  <ExportPanel key={saved.id} document={{versionId:saved.id,versionNumber:saved.version_number,createdAt:saved.created_at,content:saved.content,source:saved.source,snapshot,scenes:scenes.data,publication:material ? {...material,script_version_id:versionId} : null}} />
  </section></>;
 }

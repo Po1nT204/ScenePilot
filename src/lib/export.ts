@@ -13,6 +13,7 @@ export type ExportDocument = {
  publication?: (PublicationDraft & {script_version_id:string}) | null;
 };
 export type ExportFormat = "txt"|"md";
+export type ExportMode = "narration"|"visuals"|"archive";
 export function sourceLabel(source:string) {
  return ({manual:"Ручной ввод",test:"Тестовый шаблон",yandex:"YandexGPT",unknown:"Не зафиксирован (старая версия)"} as Record<string,string>)[source] ?? "Неизвестный источник";
 }
@@ -22,13 +23,21 @@ function fenced(text:string) {
  const fence="`".repeat(Math.max(3,...runs.map(run=>run.length+1)));
  return fence+"text\n"+text+"\n"+fence;
 }
-export function exportText(document:ExportDocument,format:ExportFormat):string {
+export function exportScenes(document:ExportDocument):ExportScene[] {
  if(document.scenes.some(scene=>scene.script_version_id!==document.versionId)) throw new Error("Scene version mismatch");
  if(document.publication && document.publication.script_version_id!==document.versionId) throw new Error("Publication version mismatch");
  const publication = document.publication ? publicationPayload(document.publication) : null;
  if(document.publication && !publication) throw new Error("Invalid publication material");
  const scenes=[...document.scenes].sort((a,b)=>a.position-b.position);
  if(new Set(scenes.map(scene=>scene.position)).size!==scenes.length) throw new Error("Duplicate scene position");
+ return scenes;
+}
+export function exportText(document:ExportDocument,format:ExportFormat,mode:ExportMode="archive"):string {
+ const scenes=exportScenes(document);
+ // Clean modes preserve the stored text verbatim, including whitespace and Markdown.
+ if(mode==="narration") return document.content;
+ if(mode==="visuals") return scenes.map(scene=>scene.visual_prompt).join("\n\n---\n\n");
+ const publication = document.publication ? publicationPayload(document.publication) : null;
  const heading=(level:number,text:string)=>format==="md" ? "#".repeat(level)+" "+text : text;
  const block=(text:string)=>format==="md" ? fenced(text) : text;
  const settings=document.snapshot;
@@ -63,6 +72,6 @@ export function exportText(document:ExportDocument,format:ExportFormat):string {
  } else parts.push("Материалы публикации для этой версии не сохранены.");
  return parts.join("\n\n")+"\n";
 }
-export function exportFilename(document:ExportDocument,format:ExportFormat) {
- return "scenepilot-v"+document.versionNumber+"-"+document.versionId.replace(/[^a-zA-Z0-9]/g,"").slice(0,8)+"."+format;
+export function exportFilename(document:ExportDocument,format:ExportFormat,mode:ExportMode="archive") {
+ return "scenepilot-v"+document.versionNumber+"-"+document.versionId.replace(/[^a-zA-Z0-9]/g,"").slice(0,8)+(mode==="archive"?"":"-"+mode)+"."+format;
 }
