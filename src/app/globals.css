@@ -6,6 +6,75 @@
   --line: #d9ddd3;
 
 }
+
+/* Local video studio. Existing editing pages keep their layout. */
+.video-studio { padding: 12px 0 60px; }
+.video-studio-heading { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 24px; }
+.video-studio-heading h2 { margin: 0; font-size: 32px; letter-spacing: -1px; font-weight: 500; }
+.video-studio-heading p { color: var(--muted); }
+.video-studio .eyebrow { margin: 0 0 8px; color: var(--green); font-size: 10px; }
+.video-pill { padding: 10px 14px; border: 1px solid var(--line); border-radius: 30px; font-size: 12px; white-space: nowrap; }
+.video-connection { background: #edf1e9; border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; font-size: 13px; line-height: 1.6; }
+.video-connection summary { cursor: pointer; font-weight: 600; }
+.video-connection summary span { font-weight: 400; margin-left: 12px; color: var(--muted); }
+.video-connection code { overflow-wrap: anywhere; font-size: 12px; }
+.video-studio-grid { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.video-panel { min-width: 0; background: #fffefa; border: 1px solid var(--line); border-radius: 16px; padding: 22px; }
+.video-panel h3 { margin: 0 0 20px; font-size: 19px; font-weight: 500; letter-spacing: -.4px; }
+.video-panel label { display: block; margin: 16px 0 7px; font-size: 12px; font-weight: 600; line-height: 1.5; }
+.video-panel input:not([type=checkbox]), .video-panel select, .video-panel textarea { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 7px; background: white; color: var(--ink); padding: 10px; font: inherit; font-size: 13px; }
+.video-panel textarea { resize: vertical; min-height: 100px; }
+.video-panel input:focus-visible, .video-panel textarea:focus-visible, .video-panel select:focus-visible, .video-studio summary:focus-visible, .video-studio button:focus-visible { outline: 3px solid #b35a28; outline-offset: 3px; }
+.video-panel .button { width: 100%; margin-top: 10px; padding: 12px 14px; justify-content: center; font-size: 12px; line-height: 1.5; text-align: center; border-radius: 8px; }
+.video-panel .button.secondary { background: transparent; color: var(--green); border: 1px solid var(--line); }
+.video-panel button:disabled { cursor: not-allowed; opacity: .5; }
+.video-script { max-height: 260px; overflow: auto; padding-right: 8px; font-size: 14px; line-height: 1.8; overflow-wrap: anywhere; white-space: pre-wrap; }
+.video-muted { display: block; font-size: 11px; line-height: 1.6; color: var(--muted); }
+.video-panel-title { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
+.video-panel-title .button { width: auto; margin-top: 0; }
+.video-shot-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 20px; }
+.video-shot { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.video-shot-image { aspect-ratio: 16 / 9; background: #e6e9e0; display: flex; align-items: center; justify-content: center; text-align: center; color: #566250; }
+.video-shot-image img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.video-shot-image > span { font-size: 12px; letter-spacing: 2px; }
+.video-shot-image small { display: block; margin-top: 12px; font-size: 11px; letter-spacing: 0; }
+.video-shot-copy { padding: 14px; }
+.video-shot-copy > p { margin: 0 0 12px; font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+.video-shot-copy summary { cursor: pointer; font-size: 12px; color: var(--green); margin-bottom: 8px; }
+.video-shot-copy .video-muted { margin-top: 8px; }
+.video-text-button { display: inline-block; border: 0; background: none; padding: 8px 0; color: var(--green); text-decoration: underline; text-underline-offset: 3px; font-size: 12px; cursor: pointer; line-height: 1.6; }
+.video-preview { aspect-ratio: 16 / 9; background: #202e28; border-radius: 10px; overflow: hidden; color: #eef1e8; display: flex; align-items: center; justify-content: center; text-align: center; }
+.video-preview video { display: block; width: 100%; height: 100%; }
+.video-preview > div { padding: 16px; }
+.video-preview span { font-size: 32px; }
+.video-preview p { font-size: 12px; margin: 8px 0; }
+.video-preview small { font-size: 10px; color: #c5cfc2; }
+.video-status { font-size: 12px; line-height: 1.7; padding: 14px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.video-status strong { display: inline-block; color: var(--green); }
+.video-audio audio { width: 100%; height: 36px; }
+.video-cost { margin-top: 22px; display: grid; grid-template-columns: 1fr auto; gap: 8px; font-size: 12px; }
+.video-cost strong { font-size: 20px; color: var(--green); }
+.video-cost small { grid-column: 1 / -1; color: var(--muted); font-size: 10px; line-height: 1.6; }
+.video-panel .video-consent { display: flex; align-items: flex-start; gap: 8px; font-size: 11px; font-weight: 400; }
+.video-consent input { margin-top: 2px; accent-color: var(--green); }
+.video-alert { padding: 14px 16px; background: #fff2e5; border: 1px solid #dfbc90; border-radius: 8px; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.video-empty { padding: 50px 10px; text-align: center; color: var(--muted); }
+.video-empty-number { font-family: Georgia, serif; font-style: italic; font-size: 35px; color: #89957c; }
+.video-empty h4 { margin: 24px 0 8px; color: var(--ink); font-weight: 500; }
+.video-empty p { font-size: 13px; line-height: 1.7; }
+.video-studio .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+@media (max-width: 1000px) {
+  .video-studio-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); }
+  .video-result { grid-column: 1 / -1; }
+  .video-result .video-preview { max-width: 580px; }
+}
+@media (max-width: 640px) {
+  .video-studio-grid { grid-template-columns: minmax(0, 1fr); }
+  .video-studio-heading { align-items: flex-start; flex-direction: column; gap: 0; }
+  .video-studio-heading h2 { font-size: 28px; }
+  .video-panel { padding: 18px; }
+  .video-connection { padding: 14px; }
+}
 * {
   box-sizing: border-box;
 

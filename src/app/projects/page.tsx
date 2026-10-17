@@ -25,7 +25,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
         <p className="auth-description">Сценарии, сцены, тексты публикации и экспорт — открывайте нужный материал сразу.</p></div>
       {!error && <Link className="button" href="/projects/new">+ Новый ролик</Link>}
     </div>
-    {query.deleted === "1" && <p className="success-notice" role="status">Ролик и его материалы удалены.</p>}
+    {query.deleted === "1" && <p className="success-notice" role="status">Проект и его облачные материалы удалены. Локальные файлы видео остаются на компьютере.</p>}
     {error ? <section className="library-empty"><h2>Не удалось загрузить библиотеку</h2>
       <p role="alert">{["PGRST205", "42P01", "PGRST200"].includes(error.code)
         ? "Для библиотеки нужны таблицы проектов, версий и сцен. Проверьте миграции по инструкции в README."
@@ -53,6 +53,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                   <Link className="button" href={scriptUrl}>{version ? "Сценарий" : "Создать сценарий"}</Link>
                   {version ? <>
                     <Link className="text-button" href={`${base}/scenes?version=${version.id}`}>{sceneCount ? "Сцены" : "Создать сцены"}</Link>
+                    <Link className="text-button" href={`${base}/video?version=${version.id}`}>Видео</Link>
                     <Link className="text-button" href={`${base}/publication?version=${version.id}`}>Публикация</Link>
                     <Link className="text-button" href={`${base}/export?version=${version.id}`}>Экспорт</Link>
                   </> : <p className="material-hint">Сцены, тексты публикации и экспорт станут доступны после сохранения сценария.</p>}
