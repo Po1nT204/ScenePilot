@@ -5,35 +5,42 @@ import { saveScript } from "@/app/projects/[id]/scripts/actions";
 import { generateScriptExample } from "@/app/projects/[id]/scripts/generate";
 import { scriptLimit, type ScriptState } from "@/lib/scripts/validation";
 import {NarrationMeter} from "./narration-meter";
-import {supportsFullGeneration,longGenerationMessage} from "@/lib/duration";
+import {scriptGenerationOptions} from "@/lib/duration";
+import {narrationPace,validNarrationPace,narrationTarget,narrationDeviation} from '@/lib/narration';
 import {sourceLabel} from "@/lib/export";
 
-export function ScriptEditor({ projectId, initial, versionNumber, initialSource, yandexEnabled, targetDuration, versionDuration }: { projectId: string; initial: string; versionNumber?: number; initialSource:string; yandexEnabled:boolean; targetDuration:number; versionDuration?:number }) {
+export function ScriptEditor({ projectId, initial, versionNumber, initialSource, yandexEnabled, targetDuration, versionDuration,initialPace }: { projectId: string; initial: string; versionNumber?: number; initialSource:string; yandexEnabled:boolean; targetDuration:number; versionDuration?:number;initialPace?:number }) {
  const [content, setContent] = useState(initial);
  const [source,setSource] = useState(initialSource);
+ const [pace,setPace]=useState(String(initialPace ?? narrationPace.default));
+ const paceNumber=/^\d+$/.test(pace) ? Number(pace) : NaN;
+ const paceValid=validNarrationPace(paceNumber);
+ const target=paceValid ? narrationTarget(targetDuration,paceNumber) : null;
+ const options=scriptGenerationOptions(targetDuration);
  const [generating, setGenerating] = useState(false);
  const [generationMessage, setGenerationMessage] = useState("");
  const generationLock = useRef(false);
  const [state, action, pending] = useActionState(saveScript.bind(null, projectId), { message: "" } as ScriptState);
  const router = useRouter();
  const handled = useRef<string | undefined>(undefined);
- const dirty = content !== initial && !state.savedId;
+ const dirty = (content !== initial || pace!==String(initialPace ?? narrationPace.default)) && !state.savedId;
  const busy = pending || generating;
  async function generate(mode: "test" | "yandex") {
   if (generationLock.current || pending || state.savedId) return;
-  if (mode === "yandex" && !supportsFullGeneration(targetDuration)) {setGenerationMessage(longGenerationMessage);return;}
-  if (mode === "yandex" && !window.confirm("Отправить настройки проекта и сохранённые требования канала в Yandex AI Studio? Это платный запрос, максимум 2000 токенов ответа. Новый результат заменит текст редактора; сохранённые версии останутся.")) return;
+  if(!target || !options) {setGenerationMessage('Укажите корректные цель и темп чтения.');return;}
+  if (mode === "yandex" && !window.confirm(`Отправить настройки проекта и требования канала в Yandex? Один платный запрос, максимум ${options.maxTokens} токенов ответа. Ориентир — ${target.words} слов при ${target.pace} слов/мин. Результат заменит черновик. Сохранённые версии останутся.`)) return;
   if (mode === "test" && content.trim() && !window.confirm("Заменить текст в редакторе тестовым примером? Несохранённые правки будут потеряны. Сохранённые версии останутся без изменений.")) return;
   generationLock.current = true;
   setGenerating(true);
-  setGenerationMessage(mode === "yandex" ? "YandexGPT пишет сценарий. Ожидание — до 45 секунд…" : "Готовим тестовый пример…");
+  setGenerationMessage(mode === "yandex" ? `YandexGPT пишет сценарий. Ожидание — до ${options.timeoutMs/1000} секунд…` : "Готовим тестовый пример…");
   try {
-   const result = await generateScriptExample(projectId,mode);
+   const result = await generateScriptExample(projectId,mode,paceNumber);
    if (result.error !== undefined) setGenerationMessage(result.error);
    else {
     setContent(result.content);
     setSource(mode);
-    setGenerationMessage(`${mode === "test" ? "Тестовый пример" : "Сценарий YandexGPT"} готов, но ещё не сохранён. Отредактируйте и сохраните новую версию.${result.tokens !== undefined ? ` Всего токенов: ${result.tokens}.` : ""}`);
+    const deviation=narrationDeviation(result.content,target.words);
+    setGenerationMessage(`${mode === "test" ? "Тестовый пример (объём не подгоняется)" : "Сценарий YandexGPT"}: ${deviation.words} слов, цель ${target.words}, отклонение ${deviation.percent>0?'+':''}${deviation.percent}%. Ещё не сохранён.${result.tokens !== undefined ? ` Всего токенов: ${result.tokens}.` : ""}`);
    }
   } catch {
    setGenerationMessage("Не удалось получить пример. Проверьте соединение и вход в аккаунт. Текст не изменён.");
@@ -62,12 +69,12 @@ export function ScriptEditor({ projectId, initial, versionNumber, initialSource,
  }, [dirty, busy]);
  return <form action={action} className="auth-form project-form material-editor">
   <div className="editor-actions" aria-label="Действия со сценарием">
-   <button className="button" type="submit" disabled={busy || !!state.savedId || !content.trim() || content.trim() === initial.trim()}>{pending ? "Сохраняем…" : "Сохранить новую версию"}</button>
-   <button className="text-button" type="button" onClick={() => generate("yandex")} disabled={!yandexEnabled || !supportsFullGeneration(targetDuration) || busy || !!state.savedId}>YandexGPT · платно</button>
-   <button className="text-button" type="button" onClick={() => generate("test")} disabled={busy || !!state.savedId}>Тестовый пример · бесплатно</button>
+   <button className="button" type="submit" disabled={busy || !!state.savedId || !paceValid || !content.trim()}>{pending ? "Сохраняем…" : "Сохранить новую версию"}</button>
+   <button className="text-button" type="button" onClick={() => generate("yandex")} disabled={!yandexEnabled || !options || !paceValid || busy || !!state.savedId}>YandexGPT · платно</button>
+   <button className="text-button" type="button" onClick={() => generate("test")} disabled={!paceValid || busy || !!state.savedId}>Тестовый пример · бесплатно</button>
   </div>
   {!yandexEnabled && <p className="editor-note">YandexGPT выключен или не настроен.</p>}
-  {!supportsFullGeneration(targetDuration) && <p className="editor-note">Для цели свыше 5 минут генерация сценария Yandex пока недоступна. Можно ввести текст вручную.</p>}
+  {target && <p className="editor-note">Ориентир генерации: {target.words} слов ({target.minWords}–{target.maxWords}) · {target.pace} слов/мин{targetDuration>300 ? ' · Для длинного текста нужна YandexGPT 5.1' : ''}</p>}
   <p className="form-message" role="status">{generationMessage}</p>
   <p className="form-message" role="status">{state.message}</p>
   <div className="editor-meta">
@@ -76,11 +83,12 @@ export function ScriptEditor({ projectId, initial, versionNumber, initialSource,
   </div>
   <fieldset disabled={busy || !!state.savedId}>
    <input type="hidden" name="source" value={source} />
+   <input type="hidden" name="narration_pace" value={pace} />
    <label htmlFor="script-content">Текст сценария</label>
    <textarea id="script-content" name="content" rows={18} required maxLength={scriptLimit} value={content} onChange={event => setContent(event.target.value)} aria-describedby="script-hint" />
    <p id="script-hint" className="editor-note">{content.length} / {scriptLimit} символов · Без автосохранения</p>
    {versionDuration !== undefined && versionDuration !== targetDuration && <p className="editor-note">Цель открытой версии: {versionDuration} сек. Для новой версии и оценки: {targetDuration} сек.</p>}
-   <NarrationMeter text={content} targetSeconds={targetDuration} targetLabel="Цель новой версии" disabled={busy || !!state.savedId} />
+   <NarrationMeter text={content} targetSeconds={targetDuration} targetLabel="Цель новой версии" pace={pace} onPaceChange={setPace} initialPace={initialPace} savePace disabled={busy || !!state.savedId} />
   </fieldset>
   <details className="editor-help">
    <summary>О версиях и генерации</summary>

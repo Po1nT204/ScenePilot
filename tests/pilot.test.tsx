@@ -37,13 +37,19 @@ test('long manual script splits without losing text and exports against its own 
  const output=exportText(document,'txt');
  assert.match(output,/720 сек/);assert.ok(output.includes(content));
 });
-test('long duration is valid for projects and ideas, full-text generation is blocked before transport',async()=>{
+test('long duration allows one bounded script request but keeps scene generation blocked',async()=>{
  const config={apiKey:'TEST',folderId:'test',model:'yandexgpt-5.1'};
  const brief={title:'Title',topic:'Topic',genre:'Essay',style:'Calm',language:'en',target_duration_seconds:600};
  for(const duration of [301,480,600,720,900]) {
   assert.equal(validDuration(duration),true);assert.ok(validateIdeaRequest('seed','en',duration));
   assert.equal(supportsFullGeneration(duration),false);
-  await assert.rejects(requestYandexScript(config,{...brief,target_duration_seconds:duration},async()=>assert.fail('No paid request')),/до 5 минут/);
+  let calls=0;
+  await requestYandexScript(config,{...brief,target_duration_seconds:duration},async(_url,init)=>{
+   calls++;const body=JSON.parse(String(init?.body));assert.equal(body.completionOptions.maxTokens,'6000');
+   assert.equal(JSON.parse(body.messages[1].text).target_words,Math.round(duration*140/60));
+   return Response.json({alternatives:[{status:'ALTERNATIVE_STATUS_FINAL',message:{text:'Finished thought.'}}]});
+  });
+  assert.equal(calls,1);
   await assert.rejects(requestYandexScenes(config,'Saved script',{...brief,target_duration_seconds:duration},async()=>assert.fail('No paid request')),/до 5 минут/);
  }
  assert.equal(validDuration(901),false);assert.equal(supportsFullGeneration(300),true);

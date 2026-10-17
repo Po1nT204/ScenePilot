@@ -7,6 +7,7 @@ export type ScriptBrief = {
  language: string;
  target_duration_seconds: number;
  channel?: ChannelProfile | null;
+ narration_pace?: number;
 };
 
 // A deterministic fixture for testing the workflow, not a language model.

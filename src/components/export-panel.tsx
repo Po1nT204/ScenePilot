@@ -1,6 +1,6 @@
 "use client";
 import {useRef,useState} from "react";
-import {exportFilename,exportScenes,exportText,sourceLabel,type ExportDocument,type ExportFormat,type ExportMode} from "@/lib/export";
+import {exportFilename,exportScenes,exportShots,exportText,sourceLabel,type ExportDocument,type ExportFormat,type ExportMode} from "@/lib/export";
 export function ExportPanel({document}:{document:ExportDocument}) {
  const [mode,setMode]=useState<ExportMode>("narration");
  const [archiveFormat,setArchiveFormat]=useState<ExportFormat>("txt");
@@ -10,8 +10,10 @@ export function ExportPanel({document}:{document:ExportDocument}) {
  const promptFields=useRef<Record<number,HTMLTextAreaElement|null>>({});
  const format=mode==="archive"?archiveFormat:"txt";
  const scenes=exportScenes(document);
+ const shots=exportShots(document);
+ const prompts=mode==='shots' ? shots.map((shot,index)=>({key:index,label:`Кадр ${scenes.find(scene=>scene.id===shot.scene_id)!.position}.${shot.position}`,source:shot.source,text:shot.visual_prompt})) : scenes.map(scene=>({key:scene.position,label:`Сцена ${scene.position}`,source:scene.source,text:scene.visual_prompt}));
  const text=exportText(document,format,mode);
- const empty=mode==="visuals" && scenes.length===0;
+ const empty=(mode==="visuals" || mode==='shots') && prompts.length===0;
  function download() {
   if(empty) return;
   try {
@@ -35,6 +37,7 @@ export function ExportPanel({document}:{document:ExportDocument}) {
   <select id="export-mode" value={mode} disabled={copying} onChange={event=>{setMode(event.target.value as ExportMode);setMessage("");}}>
    <option value="narration">Текст озвучки</option>
    <option value="visuals">Визуальные промпты</option>
+   <option value="shots">Промпты кадров</option>
    <option value="archive">Полный архив</option>
   </select>
   {mode==="archive" && <>
@@ -47,21 +50,23 @@ export function ExportPanel({document}:{document:ExportDocument}) {
   {mode!=="narration" && scenes.length>0 && <p>Источники сцен: {[...new Set(scenes.map(scene=>sourceLabel(scene.source)))].join(", ")}</p>}
   {mode==="narration" && <p>Сохранённый сценарий без добавленного оформления.</p>}
   {mode==="visuals" && !empty && <p>Сохранённые промпты по порядку сцен, разделитель — «---».</p>}
-  {empty ? <p role="status">В этой версии нет сохранённых сцен. Сначала добавьте и сохраните их во вкладке «Сцены».</p> : <>
+  {mode==='shots' && !empty && <p>Источники кадров: {[...new Set(shots.map(shot=>sourceLabel(shot.source)))].join(', ')}. Порядок: эпизод, затем кадр; разделитель — «---».</p>}
+  {mode==='shots' && shots.some(shot=>document.shotPlans?.find(plan=>plan.scene_id===shot.scene_id)?.narration_snapshot!==scenes.find(scene=>scene.id===shot.scene_id)?.narration) && <p role="alert">Часть планов требует сверки с озвучкой эпизодов. Экспорт содержит сохранённые промпты.</p>}
+  {empty ? <p role="status">{mode==='shots'?'В этой версии нет сохранённых кадров. Откройте кадры эпизода во вкладке «Сцены» и сохраните план.':'В этой версии нет сохранённых сцен. Сначала добавьте и сохраните их во вкладке «Сцены».'}</p> : <>
    <div className="export-actions">
     <button className="button" disabled={copying} onClick={download}>Скачать {format==="txt"?"TXT":"Markdown"}</button>
     <button className="text-button" disabled={copying} onClick={()=>copy(text,preview.current)}>Скопировать {format==="txt"?"текст":"Markdown"}</button>
    </div>
-   <label htmlFor="export-preview">Предпросмотр — {mode==="narration"?"текст озвучки":mode==="visuals"?"визуальные промпты":"полный архив"}</label>
+   <label htmlFor="export-preview">Предпросмотр — {mode==="narration"?"текст озвучки":mode==="visuals"?"визуальные промпты":mode==='shots'?'промпты кадров':"полный архив"}</label>
    <textarea id="export-preview" ref={preview} readOnly value={text} rows={16} spellCheck={false} />
   </>}
   <p role="status">{message}</p>
-  {mode==="visuals" && !empty && <details>
+  {(mode==="visuals" || mode==='shots') && !empty && <details>
    <summary>Скопировать отдельный промпт</summary>
-   {scenes.map(scene=><div key={scene.position}>
-    <label htmlFor={`export-prompt-${scene.position}`}>Сцена {scene.position} · {sourceLabel(scene.source)}</label>
-    <textarea id={`export-prompt-${scene.position}`} ref={field=>{promptFields.current[scene.position]=field;}} readOnly value={scene.visual_prompt} rows={4} spellCheck={false} />
-    <button className="text-button" disabled={copying} onClick={()=>copy(scene.visual_prompt,promptFields.current[scene.position])}>Скопировать промпт сцены {scene.position}</button>
+   {prompts.map(prompt=><div key={prompt.key}>
+    <label htmlFor={`export-prompt-${prompt.key}`}>{prompt.label} · {sourceLabel(prompt.source)}</label>
+    <textarea id={`export-prompt-${prompt.key}`} ref={field=>{promptFields.current[prompt.key]=field;}} readOnly value={prompt.text} rows={4} spellCheck={false} />
+    <button className="text-button" disabled={copying} onClick={()=>copy(prompt.text,promptFields.current[prompt.key])}>Скопировать промпт · {prompt.label}</button>
    </div>)}
   </details>}
  </section>;

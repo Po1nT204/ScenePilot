@@ -1,10 +1,12 @@
 "use client";
 import {useId,useState} from 'react';
-import {compareNarration,estimateNarration,formatDuration,narrationPace} from '@/lib/narration';
+import {compareNarration,estimateNarration,formatDuration,narrationPace,narrationDeviation} from '@/lib/narration';
 
-export function NarrationMeter({text,targetSeconds,targetLabel,sourceText,sceneCount,disabled=false}: {text:string;targetSeconds:number;targetLabel:string;sourceText?:string;sceneCount?:number;disabled?:boolean}) {
+export function NarrationMeter({text,targetSeconds,targetLabel,sourceText,sceneCount,disabled=false,pace:controlledPace,onPaceChange,initialPace,savePace=false}: {text:string;targetSeconds:number;targetLabel:string;sourceText?:string;sceneCount?:number;disabled?:boolean;pace?:string;onPaceChange?:(value:string)=>void;initialPace?:number;savePace?:boolean}) {
  const id=useId();
- const [pace,setPace]=useState<string>(String(narrationPace.default));
+ const [localPace,setLocalPace]=useState<string>(String(initialPace ?? narrationPace.default));
+ const pace=controlledPace ?? localPace;
+ const setPace=onPaceChange ?? setLocalPace;
  const number=Number(pace);
  const valid=/^\d+$/.test(pace) && number>=narrationPace.min && number<=narrationPace.max;
  const estimate=valid ? estimateNarration(text,targetSeconds,number) : null;
@@ -21,9 +23,10 @@ export function NarrationMeter({text,targetSeconds,targetLabel,sourceText,sceneC
    <summary>Темп и расчёт · {valid ? `${pace} слов/мин` : 'укажите темп'}</summary>
   <label htmlFor={id}>Темп чтения, слов в минуту</label>
   <input id={id} type="text" inputMode="numeric" value={pace} disabled={disabled} onChange={e=>setPace(e.target.value)} aria-describedby={`${id}-hint`} aria-invalid={!valid} />
-  <p className="field-hint" id={`${id}-hint`}>Условный темп для планирования: {narrationPace.min}–{narrationPace.max}. Настройка действует только на этом экране и не сохраняется. Паузы, музыка и скорость диктора не учтены; заголовки и инструкции тоже считаются словами.</p>
+  <p className="field-hint" id={`${id}-hint`}>Условный темп: {narrationPace.min}–{narrationPace.max}. {savePace ? 'Используется для генерации и сохранится с новой версией.' : 'Изменение оценки на этом экране не сохраняется.'} {initialPace===undefined && 'В старой версии темп не зафиксирован; исходный ориентир — 140.'} Паузы и скорость диктора не учтены. Точное время проверяется реальной озвучкой.</p>
   {estimate && <>
    <p>Для цели при этом темпе — около {estimate.targetWords} слов. «Короче» или «длиннее» означает отклонение больше 20%.</p>
+   <p>Отклонение: {narrationDeviation(text,estimate.targetWords).difference > 0 ? '+' : ''}{narrationDeviation(text,estimate.targetWords).difference} слов ({narrationDeviation(text,estimate.targetWords).percent > 0 ? '+' : ''}{narrationDeviation(text,estimate.targetWords).percent}%).</p>
    {sceneCount !== undefined && sceneCount > 0 && <p>{sceneCount} сцен · в среднем около {formatDuration(estimate.seconds/sceneCount)} озвучки на сцену. Реальные сцены могут быть разной длины.</p>}
   </>}
   {comparison && <p>Сценарий: {comparison.scriptWords} слов; сцены: {comparison.narrationWords}. Сравнение игнорирует пробелы и переносы строк; это проверка текста, а не смысла.</p>}

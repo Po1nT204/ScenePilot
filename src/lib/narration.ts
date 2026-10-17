@@ -1,5 +1,18 @@
 // Planning assumptions, not measured speech timing. No model or network calls.
 export const narrationPace = { min: 80, max: 220, default: 140 } as const;
+export function validNarrationPace(value: unknown): value is number {
+ return typeof value === 'number' && Number.isInteger(value) && value >= narrationPace.min && value <= narrationPace.max;
+}
+export function narrationTarget(targetSeconds:number,pace:number) {
+ if (!validNarrationPace(pace) || !Number.isInteger(targetSeconds) || targetSeconds < 1 || targetSeconds > 900) throw new Error('Invalid narration target');
+ const words=Math.max(1,Math.round(targetSeconds*pace/60));
+ return {pace,words,minWords:Math.max(1,Math.floor(words*90/100)),maxWords:Math.ceil(words*110/100)};
+}
+export function narrationDeviation(text:string,targetWords:number) {
+ const words=countNarrationWords(text);
+ const difference=words-targetWords;
+ return {words,difference,percent:Math.round(difference/targetWords*100)};
+}
 export function countNarrationWords(text: string): number {
  return (text.match(/[\p{L}\p{N}]+(?:[’'\-][\p{L}\p{N}]+)*/gu) ?? []).length;
 }

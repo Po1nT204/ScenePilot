@@ -446,7 +446,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid #b35a28; outline-
 .scene-toolbar, .scene-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .scene-card-actions { margin: 12px 0 20px; }
 .scene-card-actions button { min-height: 44px; padding: 9px 12px; }
-.scene-card h2:focus { outline: 2px solid var(--green); outline-offset: 4px; }
+.scene-card h2:focus, .scene-card h3:focus { outline: 2px solid var(--green); outline-offset: 4px; }
 .publication-editor { margin-top: 24px; }
 .publication-variants { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: #fffefa; }
 .publication-variants h3 { margin-top: 0; }

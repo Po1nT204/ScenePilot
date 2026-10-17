@@ -3,10 +3,13 @@ import { revalidatePath } from "next/cache";
 import { requireProjectUser } from "@/lib/projects/server";
 import { isProjectId } from "@/lib/projects/validation";
 import { validateScript, type ScriptState } from "@/lib/scripts/validation";
+import {validNarrationPace} from '@/lib/narration';
 
 export async function saveScript(projectId: string, _previous: ScriptState, form: FormData): Promise<ScriptState> {
  const checked = validateScript(form.get("content"));
  if (checked.error) return { message: checked.error };
+ const pace=Number(form.get('narration_pace'));
+ if(!validNarrationPace(pace)) return {message:'Укажите темп от 80 до 220 слов в минуту.'};
  const source = form.get("source");
  if (typeof source !== "string" || !["manual","test","yandex","unknown"].includes(source)) return {message:"Неизвестный источник сценария."};
  if (!isProjectId(projectId)) return { message: "Проект не найден или недоступен." };
@@ -15,8 +18,8 @@ export async function saveScript(projectId: string, _previous: ScriptState, form
   const project = await supabase.from("projects").select("id").eq("id", projectId).eq("owner_id", user.id).maybeSingle();
   if (project.error) return { message: "Не удалось проверить проект. Текст остаётся в редакторе." };
   if (!project.data) return { message: "Проект не найден или недоступен." };
-  const { data, error } = await supabase.rpc("save_script_version", { p_project_id: projectId, p_content: checked.content, p_source:source });
-  if (error) return { message: error.code === "PGRST202" ? "Выполните миграцию 202610130003_script_source.sql из README. Текст остаётся в редакторе." : "Не удалось сохранить версию. Текст остаётся в редакторе. Проверьте историю перед повторной попыткой." };
+  const { data, error } = await supabase.rpc("save_script_version_with_pace", { p_project_id: projectId, p_content: checked.content, p_source:source,p_narration_pace:pace });
+  if (error) return { message: error.code === "PGRST202" ? "Выполните миграцию 202610160001_script_pace.sql по docs/setup.md. Текст остаётся в редакторе." : "Не удалось сохранить версию. Текст остаётся в редакторе. Проверьте историю перед повторной попыткой." };
   if (typeof data !== "string" || !isProjectId(data)) return { message: "Не удалось подтвердить сохранение. Проверьте историю версий." };
   revalidatePath("/projects/" + projectId + "/scripts");
   revalidatePath("/projects");

@@ -19,9 +19,11 @@ export default async function ExportPage({params,searchParams}:{params:Promise<{
  const version=await supabase.from("script_versions").select("id,version_number,created_at,content,settings_snapshot,source").eq("id",versionId).eq("project_id",id).maybeSingle();
  if(version.error) throw new Error("Version unavailable");
  if(!version.data) notFound();
- const scenes=await supabase.from("scenes").select("script_version_id,position,description,visual_prompt,narration,source").eq("script_version_id",versionId).order("position");
+ const scenes=await supabase.from("scenes").select("id,script_version_id,position,description,visual_prompt,narration,source").eq("script_version_id",versionId).order("position");
  if(scenes.error) return <section><h1>Экспорт недоступен</h1><p role="alert">Не удалось загрузить сохранённые сцены. Обновите страницу позже. Неполный файл не сформирован.</p><Link href={`/projects/${id}/scripts?version=${versionId}`}>Вернуться к сценарию</Link></section>;
  const saved=version.data;
+ const [shots,plans]=await Promise.all([supabase.from('scene_shots').select('*').eq('script_version_id',versionId),supabase.from('scene_shot_plans').select('*').eq('script_version_id',versionId)]);
+ if(shots.error||plans.error) return <><ProjectWorkspace projectId={id} title={project.data.title} current="export" version={saved}/><p role="alert">Не удалось загрузить кадры. Проверьте соединение и миграцию 202610160002_scene_shots.sql. Неполный архив не сформирован.</p></>;
  const publication=await supabase.from("publication_materials").select(publicationColumns).eq("script_version_id",versionId).maybeSingle();
  const material=publicationPayload(publication.data);
  if(publication.error || (publication.data && !material)) return <><ProjectWorkspace projectId={id} title={project.data.title} current="export" version={saved} /><section><h2>Экспорт недоступен</h2><p role="alert">{publication.error && ["42P01","PGRST205"].includes(publication.error.code) ? publicationMigrationMessage : "Не удалось загрузить материалы публикации. Обновите страницу позже. Неполный файл не сформирован."}</p></section></>;
@@ -31,6 +33,6 @@ export default async function ExportPage({params,searchParams}:{params:Promise<{
   <h2>Экспорт материалов</h2>
   {snapshot.title !== project.data.title && <p>Название в сохранённой версии: {snapshot.title}</p>}
   <p>Только сохранённые данные. Правки из редакторов не включены; после изменений в другой вкладке обновите страницу. Полные сведения об источниках — в архиве.</p>
-  <ExportPanel key={saved.id} document={{versionId:saved.id,versionNumber:saved.version_number,createdAt:saved.created_at,content:saved.content,source:saved.source,snapshot,scenes:scenes.data,publication:material ? {...material,script_version_id:versionId} : null}} />
+  <ExportPanel key={saved.id} document={{versionId:saved.id,versionNumber:saved.version_number,createdAt:saved.created_at,content:saved.content,source:saved.source,snapshot,scenes:scenes.data,shots:shots.data,shotPlans:plans.data,publication:material ? {...material,script_version_id:versionId} : null}} />
  </section></>;
 }
