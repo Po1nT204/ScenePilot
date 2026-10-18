@@ -1,11 +1,11 @@
 import { parseAlignment, type Alignment } from './model';
 
 export class ProviderError extends Error {
-  constructor(message: string, public uncertain = false) { super(message); }
+  constructor(message: string, public uncertain = false, public imageTaskFinished = false) { super(message); }
 }
-export type ProviderConfig = { enabled: boolean; elevenKey: string; bflKey: string };
+export type ProviderConfig = { enabled: boolean; elevenKey: string; bflKey: string; cloudflareAccountId?: string; cloudflareToken?: string };
 export function providerConfig(): ProviderConfig {
-  return { enabled: process.env.VIDEO_GENERATION_ENABLED === 'true', elevenKey: process.env.ELEVENLABS_API_KEY || '', bflKey: process.env.BFL_API_KEY || '' };
+  return { enabled: process.env.VIDEO_GENERATION_ENABLED === 'true', elevenKey: process.env.ELEVENLABS_API_KEY || '', bflKey: process.env.BFL_API_KEY || '', cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID || '', cloudflareToken: process.env.CLOUDFLARE_API_TOKEN || '' };
 }
 export async function limitedBytes(response: Response, max: number) {
   if (Number(response.headers.get('content-length')) > max) throw new ProviderError('Ответ провайдера слишком велик.', true);
@@ -76,8 +76,9 @@ export async function submitImage(prompt: string, key: string, transport: typeof
 }
 export async function checkImage(url: string, key: string, transport: typeof fetch = fetch): Promise<{ pending: true } | { pending: false; bytes: Buffer }> {
   const payload = await json(await request(pollingURL(url), { headers: { 'x-key': key } }, transport, 'BFL'));
-  if (payload.status === 'Pending' || payload.status === 'Running' || payload.status === 'Processing') return { pending: true };
-  if (payload.status !== 'Ready') throw new ProviderError('BFL не завершил генерацию: задача отклонена, завершилась ошибкой или результат истёк. Новый запрос не выполнялся.');
+  if (['Pending', 'Running', 'Processing', 'Reasoning', 'Generating'].includes(String(payload.status))) return { pending: true };
+  if (['Task not found', 'Request Moderated', 'Content Moderated', 'No Card Generated', 'Error'].includes(String(payload.status))) throw new ProviderError('BFL не завершил генерацию: задача отклонена, завершилась ошибкой или результат истёк. Проверьте историю BFL; новый запрос возможен отдельной кнопкой кадра.', false, true);
+  if (payload.status !== 'Ready') throw new ProviderError('BFL вернул неизвестное состояние задачи. Проверьте задачу позже; новый запрос не выполнялся.', true);
   const result = payload.result as { sample?: unknown } | undefined;
   const bytes = await limitedBytes(await request(imageURL(result?.sample), {}, transport, 'Файл BFL'), 16 * 1024 * 1024);
   if (bytes[0] !== 255 || bytes[1] !== 216 || bytes[2] !== 255) throw new ProviderError('BFL вернул файл, который не является JPEG.');

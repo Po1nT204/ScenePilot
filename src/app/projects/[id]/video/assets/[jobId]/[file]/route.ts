@@ -16,7 +16,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const path = assetFile(job, file), info = await stat(path);
     const range = byteRange(request.headers.get('range'), info.size);
     if (!range) return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${info.size}`, 'Cache-Control': 'no-store' } });
-    const type = file.endsWith('.mp4') ? 'video/mp4' : file.endsWith('.mp3') ? 'audio/mpeg' : file.endsWith('.jpg') ? 'image/jpeg' : 'application/x-subrip';
+    const type = file.endsWith('.mp4') ? 'video/mp4' : file.endsWith('.mp3') ? 'audio/mpeg' : file.endsWith('.jpg') ? 'image/jpeg' : file.endsWith('.png') ? 'image/png' : 'application/x-subrip';
     const headers: Record<string, string> = { 'Content-Type': type, 'Content-Length': String(range.end - range.start + 1), 'Accept-Ranges': 'bytes', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' };
     if (request.headers.has('range')) headers['Content-Range'] = `bytes ${range.start}-${range.end}/${info.size}`;
     if (url.searchParams.get('download') === '1') headers['Content-Disposition'] = `attachment; filename="scenepilot-${file}"`;

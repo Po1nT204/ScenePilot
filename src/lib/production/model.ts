@@ -1,10 +1,12 @@
 // Shared, serializable production data. No credentials or filesystem paths here.
+import { imagePrice, selectedImageProvider, type ImageSelection, type ImageProviderId } from './image-catalog';
 export const productionLimits = { characters: 5000, shots: 12, prompt: 2000 } as const;
 export const productionRates = { speechPerThousand: 0.08, image: 0.04, checked: '2026-10-18' } as const;
 export type Alignment = { characters: string[]; character_start_times_seconds: number[]; character_end_times_seconds: number[] };
 export type Asset = {
   state: 'empty' | 'requesting' | 'pending' | 'ready' | 'unknown' | 'failed';
   file?: string; requestId?: string; pollingUrl?: string; generatedPrompt?: string; requestedPrompt?: string;
+  provider?: ImageProviderId; requestedProvider?: ImageProviderId;
 };
 export type VideoShot = { id: string; text: string; start: number; end: number; prompt: string; image: Asset };
 export type VideoOperation = { kind: 'generate' | 'speech' | 'replace' | 'render' | 'check'; shotId?: string; budgetUSD: number; reservedUSD: number };
@@ -14,13 +16,15 @@ export type VideoJob = {
   createdAt: string; updatedAt: string; revision: number;
   status: 'draft' | 'queued' | 'running' | 'materials' | 'ready' | 'failed';
   message: string; shots: VideoShot[]; audio: Asset; alignment?: Alignment;
+  imageProvider?: ImageSelection;
   output?: string; subtitles?: string; outputStale: boolean;
   operation?: VideoOperation;
-  attempts: { id: string; kind: 'speech' | 'image'; shotId?: string; estimatedUSD: number; at: string }[];
+  attempts: { id: string; kind: 'speech' | 'image'; shotId?: string; provider?: ImageProviderId; model?: string; estimatedUSD: number; at: string }[];
 };
 export type VideoScope = { ownerId: string; projectId: string; versionId: string };
-export type VideoSetup = { enabled: boolean; speech: boolean; images: boolean; workerOnline: boolean };
+export type VideoSetup = { enabled: boolean; speech: boolean; images: boolean; imageProviders?: Record<ImageProviderId, boolean>; workerOnline: boolean };
 export type SpeechConnection = { voiceId: string; voiceName: string; tier: string; remainingCharacters: number; checkedAt: string };
+export type ImageConnection = { credits: number; checkedAt: string };
 export type VideoView = Omit<VideoJob, 'alignment' | 'ownerId'>;
 export const normalizeNarration = (text: string) => text.trim().replace(/\s+/gu, ' ');
 export const validVoice = (id: string) => /^[a-zA-Z0-9_-]{5,100}$/.test(id);
@@ -44,15 +48,30 @@ export function planShots(script: string, count = 6): Omit<VideoShot, 'id'>[] {
   return shots;
 }
 export const roundCost = (value: number) => Math.max(0, Math.ceil((value - 1e-10) * 10000) / 10000);
-export function estimatedCost(job: Pick<VideoJob, 'text' | 'audio' | 'shots'>, kind: VideoOperation['kind'], shotId?: string) {
+export function estimatedCost(job: Pick<VideoJob, 'text' | 'audio' | 'shots' | 'imageProvider'>, kind: VideoOperation['kind'], shotId?: string) {
   if (kind === 'render' || kind === 'check') return 0;
   if (kind === 'speech') return roundCost(job.audio.file ? 0 : job.text.length / 1000 * productionRates.speechPerThousand);
   if (kind === 'replace') {
     if (!job.shots.some(s => s.id === shotId)) throw new Error('Кадр не найден.');
-    return productionRates.image;
+    return imagePrice(job);
   }
   const images = job.shots.filter(s => !s.image.file && s.image.state !== 'pending').length;
-  return roundCost((job.audio.file ? 0 : job.text.length / 1000 * productionRates.speechPerThousand) + images * productionRates.image);
+  return roundCost((job.audio.file ? 0 : job.text.length / 1000 * productionRates.speechPerThousand) + images * imagePrice(job));
+}
+export function createsImages(job: Pick<VideoJob, 'shots'>, kind: VideoOperation['kind']) {
+  return kind === 'replace' || (kind === 'generate' && job.shots.some(s => !s.image.file && s.image.state !== 'pending'));
+}
+export function createsMaterials(job: Pick<VideoJob, 'shots' | 'audio'>, kind: VideoOperation['kind']) {
+  return createsImages(job, kind) || ((kind === 'generate' || kind === 'speech') && !job.audio.file);
+}
+export function neededImageProviders(job: Pick<VideoJob, 'shots' | 'imageProvider'>, kind: VideoOperation['kind']) {
+  const ids = new Set<ImageProviderId>();
+  const selected = selectedImageProvider(job);
+  if (createsImages(job, kind) && selected !== 'none') ids.add(selected);
+  if (kind === 'generate' || kind === 'check') for (const shot of job.shots) {
+    if (shot.image.state === 'pending' || shot.image.pollingUrl) ids.add(shot.image.requestedProvider || shot.image.provider || 'bfl-flux11');
+  }
+  return [...ids];
 }
 export function requiredProviders(job: Pick<VideoJob, 'audio' | 'shots'>, kind: VideoOperation['kind']) {
   return {
@@ -68,7 +87,7 @@ export function publicJob(job: VideoJob): VideoView {
   const { alignment: _alignment, ownerId: _owner, ...view } = job;
   void _alignment; void _owner;
   return { ...view, audio: { state: job.audio.state, file: job.audio.file },
-    shots: job.shots.map(s => ({ ...s, image: { state: s.image.state, file: s.image.file, generatedPrompt: s.image.generatedPrompt } })) };
+    shots: job.shots.map(s => ({ ...s, image: { state: s.image.state, file: s.image.file, generatedPrompt: s.image.generatedPrompt, provider: s.image.provider, requestedProvider: s.image.requestedProvider } })) };
 }
 export function parseAlignment(value: unknown, text: string): Alignment {
   const a = value as Alignment | null;

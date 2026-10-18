@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { createJob, jobDirectory } from '../src/lib/production/store';
 import { renderVideo, runProgram } from '../src/lib/production/render';
 
-test('real FFmpeg renders, probes and decodes an MP4 with subtitles and audio', { timeout: 120000 }, async () => {
+test('real FFmpeg renders mixed JPEG/PNG, probes and decodes an MP4 with subtitles and audio', { timeout: 120000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'scenepilot-render-'));
   try {
     const job = await createJob({ ownerId: randomUUID(), projectId: randomUUID(), versionId: randomUUID() }, { title: 'Fixture', script: 'Тест кадра.', source: 'test', voiceId: 'fixture' }, root);
@@ -16,7 +16,7 @@ test('real FFmpeg renders, probes and decodes an MP4 with subtitles and audio', 
     const ffmpeg = process.env.FFMPEG_PATH || 'ffmpeg';
     await runProgram(ffmpeg, ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1.2', '-c:a', 'libmp3lame', 'audio.mp3'], cwd, 30000);
     for (const [i, shot] of job.shots.entries()) {
-      const file = `fixture-${i}.jpg`;
+      const file = `fixture-${i}.${i ? 'png' : 'jpg'}`;
       await runProgram(ffmpeg, ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', `color=c=${i ? 'orange' : 'green'}:s=640x360`, '-frames:v', '1', '-update', '1', file], cwd, 30000);
       shot.image = { file, state: 'ready' };
     }

@@ -2,7 +2,8 @@ import { mkdir, readFile, writeFile, rename, readdir, open, unlink, stat } from 
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
-import { type VideoJob, type VideoScope, type VideoOperation, planShots, validVoice, validateNarration, assetsReady, estimatedCost } from './model';
+import { type VideoJob, type VideoScope, type VideoOperation, planShots, validVoice, validateNarration, assetsReady, estimatedCost, createsImages, createsMaterials } from './model';
+import { type ImageSelection, validImageSelection, selectedImageProvider } from './image-catalog';
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function validJobId(id: string) { return uuid.test(id); }
@@ -66,9 +67,10 @@ export async function listJobs(scope?: VideoScope, root = productionRoot()) {
   }
   return jobs.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
-export async function createJob(scope: VideoScope, input: { title: string; script: string; source: string; voiceId: string }, root = productionRoot()) {
+export async function createJob(scope: VideoScope, input: { title: string; script: string; source: string; voiceId: string; imageProvider?: ImageSelection }, root = productionRoot()) {
   if (![scope.ownerId, scope.projectId, scope.versionId].every(validJobId) || !validVoice(input.voiceId)) throw new Error('Укажите корректный Voice ID ElevenLabs.');
-  const job: VideoJob = { schema: 1, id: randomUUID(), ...scope, ...input, text: validateNarration(input.script),
+  if (!validImageSelection(input.imageProvider ?? 'none')) throw new Error('Неизвестный модуль изображений.');
+  const job: VideoJob = { schema: 1, id: randomUUID(), ...scope, ...input, imageProvider: input.imageProvider ?? 'none', text: validateNarration(input.script),
     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), revision: 0, status: 'draft', message: 'План сохранён. Проверьте описание каждого кадра.',
     shots: planShots(input.script).map(s => ({ ...s, id: randomUUID() })), audio: { state: 'empty' }, outputStale: false, attempts: [] };
   await mkdir(jobDirectory(job.id, root), { recursive: true }); await saveJob(job, root); return job;
@@ -89,18 +91,27 @@ export function queueOperation(job: VideoJob, operation: VideoOperation, paidCon
     if (operation.kind === 'generate' && job.shots.some(s => !s.image.file && !s.image.pollingUrl && ['requesting', 'unknown'].includes(s.image.state))) throw new Error('Результат запроса изображения неизвестен. Новый запрос возможен только отдельной кнопкой замены кадра.');
   }
   const cost = estimatedCost(job, operation.kind, operation.shotId);
+  if (createsImages(job, operation.kind) && selectedImageProvider(job) === 'none') throw new Error('Сначала выберите модуль изображений в этой сборке.');
+  if (createsMaterials(job, operation.kind) && !paidConfirmed) throw new Error('Подтвердите запросы к выбранному сервису, включая бесплатную генерацию.');
   if (cost > 0 && (!paidConfirmed || !Number.isFinite(operation.budgetUSD) || operation.budgetUSD < cost || operation.budgetUSD > 10)) throw new Error('Подтвердите платные запросы и предел расходов от оценки до $10.');
   if (operation.kind === 'replace') {
     const shot = job.shots.find(s => s.id === operation.shotId)!;
-    shot.image = { state: 'empty', file: shot.image.file, generatedPrompt: shot.image.generatedPrompt };
+    if (shot.image.pollingUrl || ['pending', 'requesting'].includes(shot.image.state)) throw new Error('Запрос этого кадра ещё не завершён. Сначала нажмите «Проверить задачи изображений»; новая генерация не запущена.');
+    shot.image = { state: 'empty', file: shot.image.file, generatedPrompt: shot.image.generatedPrompt, provider: shot.image.provider };
   }
   job.operation = { ...operation, reservedUSD: 0 }; job.status = 'queued'; job.message = 'В очереди локального обработчика.';
+}
+export function selectImageProvider(job: VideoJob, selection: unknown) {
+  if (!validImageSelection(selection)) throw new Error('Неизвестный модуль изображений.');
+  if (job.status === 'queued' || job.status === 'running') throw new Error('Дождитесь завершения текущего действия.');
+  job.imageProvider = selection;
+  job.message = 'Модуль следующих изображений сохранён. Готовые файлы и озвучка сохранены; запросы не запускались.';
 }
 export async function workerOnline(root = productionRoot()) {
   try { return Date.now() - (await stat(join(root, 'heartbeat'))).mtimeMs < 15000; } catch { return false; }
 }
 export function assetFile(job: VideoJob, file: string, root = productionRoot()) {
   const files = [job.audio.file, job.output, job.subtitles, ...job.shots.map(s => s.image.file)];
-  if (!/^[0-9a-f-]+\.(mp3|jpg|mp4|srt)$/.test(file) || !files.includes(file)) throw new Error('Материал не найден.');
+  if (!/^[0-9a-f-]+\.(mp3|jpg|png|mp4|srt)$/.test(file) || !files.includes(file)) throw new Error('Материал не найден.');
   return join(jobDirectory(job.id, root), file);
 }
