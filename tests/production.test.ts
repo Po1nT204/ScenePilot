@@ -15,6 +15,8 @@ import { cloudflareImages } from '../src/lib/production/cloudflare-images';
 import { imageAdapter } from '../src/lib/production/image-registry';
 import { imageCatalog, selectedImageProvider } from '../src/lib/production/image-catalog';
 import { neededImageProviders } from '../src/lib/production/model';
+import { imagePrompt } from '../src/lib/production/visual-style';
+import { saveAppearance } from '../src/lib/production/store';
 
 const scope = { ownerId: randomUUID(), projectId: randomUUID(), versionId: randomUUID() };
 const input = { title: 'Pilot', script: 'A quiet city. The sun rises. People open their windows.', source: 'manual', voiceId: 'testVoice', imageProvider: 'bfl-flux11' as const };
@@ -167,6 +169,69 @@ test('automatic plan covers the entire narration in order without loss', () => {
   assert.throws(() => planShots('a'.repeat(5001)));
   assert.equal(planShots('One').length, 1);
 });
+
+test('new plans preserve sentence boundaries and bounded word splits, with exact timing offsets', () => {
+  const text = 'Первый человек открывает дверь. Второй идёт по улице! Наконец они встречаются у реки.';
+  assert.deepEqual(planShots(text).map(s => s.text), ['Первый человек открывает дверь.', 'Второй идёт по улице!', 'Наконец они встречаются у реки.']);
+  for (const source of [text, 'A short sentence. '.repeat(60).trim(), 'слово '.repeat(750).trim()]) {
+    const shots = planShots(source);
+    assert.ok(shots.length <= 6 && shots.length > 0);
+    assert.equal(shots.map(s => s.text).join(' '), source);
+    for (const shot of shots) assert.equal(source.slice(shot.start, shot.end), shot.text);
+  }
+  assert.equal(planShots(text, 1).length, 1);
+});
+
+test('appearance persists without changing assets, marks only subtitle changes for re-render and rejects invalid settings', async () => sandbox(async root => {
+  const job = await createJob(scope, input, root);
+  const legacyPrompt = job.shots[0].prompt;
+  job.audio = { state: 'ready', file: `${randomUUID()}.mp3` };
+  job.output = `${randomUUID()}.mp4`;
+  job.shots[0].image = { state: 'ready', file: `${randomUUID()}.jpg`, generatedPrompt: legacyPrompt, provider: 'bfl-flux11' };
+  const assets = JSON.stringify([job.audio, job.shots, job.output, job.attempts]);
+  const saved = await editJob(job.id, scope, job.revision, j => {
+    Object.assign(j, job);
+    saveAppearance(j, 'photo', true);
+  }, root);
+  assert.equal(saved.outputStale, false);
+  assert.equal(JSON.stringify([saved.audio, saved.shots, saved.output, saved.attempts]), assets);
+  const updated = await editJob(saved.id, scope, saved.revision, j => saveAppearance(j, 'photo', false), root);
+  assert.equal(updated.outputStale, true);
+  assert.equal((await readJob(job.id, root)).subtitlesEnabled, false);
+  assert.equal(JSON.stringify([updated.audio, updated.shots, updated.output, updated.attempts]), assets);
+  assert.equal(imagePrompt(legacyPrompt), legacyPrompt);
+  assert.match(imagePrompt(legacyPrompt, 'photo'), /Documentary photograph/);
+  assert.ok(!imagePrompt(legacyPrompt, 'photo').includes('Cinematic editorial illustration'));
+  assert.throws(() => saveAppearance(updated, '__proto__', false));
+  assert.throws(() => saveAppearance(updated, 'photo', 'false'));
+  updated.shots[0].prompt = 'x'.repeat(2000);
+  assert.throws(() => saveAppearance(updated, 'photo', false), /2000/);
+}));
+
+test('image requests snapshot the chosen style and local re-render never calls generators', async () => sandbox(async root => {
+  const job = await createJob(scope, input, root);
+  const calls: string[] = [];
+  const deps = fakeServices(calls);
+  saveAppearance(job, 'photo', false);
+  queueOperation(job, { kind: 'generate', budgetUSD: 1, reservedUSD: 0 }, true);
+  const baseImage = deps.image;
+  deps.image = id => ({ ...baseImage(id), submit: async prompt => {
+    assert.match(prompt, /^Documentary photograph/);
+    return baseImage(id).submit(prompt);
+  } });
+  await processJob(job, root, deps);
+  assert.equal(job.status, 'materials');
+  for (const shot of job.shots) assert.equal(shot.image.generatedPrompt, imagePrompt(shot.prompt, 'photo'));
+  calls.length = 0;
+  deps.config.enabled = false;
+  deps.render = async received => {
+    assert.equal(received.subtitlesEnabled, false); calls.push('render');
+    return { output: `${randomUUID()}.mp4`, subtitles: `${randomUUID()}.srt` };
+  };
+  queueOperation(job, { kind: 'render', budgetUSD: 0, reservedUSD: 0 }, false);
+  await processJob(job, root, deps);
+  assert.deepEqual(calls, ['render']); assert.equal(job.status, 'ready');
+}));
 test('alignment rejects mismatched text and backwards timestamps; subtitles use speech timing', () => {
   const text = 'First word. Second word.';
   const a = alignment(text);

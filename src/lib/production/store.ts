@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { type VideoJob, type VideoScope, type VideoOperation, planShots, validVoice, validateNarration, assetsReady, estimatedCost, createsImages, createsMaterials } from './model';
 import { type ImageSelection, validImageSelection, selectedImageProvider } from './image-catalog';
+import { imagePrompt, validVisualStyle } from './visual-style';
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function validJobId(id: string) { return uuid.test(id); }
@@ -106,6 +107,14 @@ export function selectImageProvider(job: VideoJob, selection: unknown) {
   if (job.status === 'queued' || job.status === 'running') throw new Error('Дождитесь завершения текущего действия.');
   job.imageProvider = selection;
   job.message = 'Модуль следующих изображений сохранён. Готовые файлы и озвучка сохранены; запросы не запускались.';
+}
+export function saveAppearance(job: VideoJob, style: unknown, subtitles: unknown) {
+  if (!validVisualStyle(style) || typeof subtitles !== 'boolean') throw new Error('Некорректные настройки оформления.');
+  if (job.status === 'queued' || job.status === 'running') throw new Error('Дождитесь завершения текущего действия.');
+  if (job.shots.some(shot => imagePrompt(shot.prompt, style).length > 2000)) throw new Error('Описание со стилем превышает 2000 символов. Сократите длинные описания кадров.');
+  if ((job.subtitlesEnabled ?? true) !== subtitles && job.output) job.outputStale = true;
+  job.visualStyle = style; job.subtitlesEnabled = subtitles;
+  job.message = 'Оформление сохранено. Субтитры изменятся при пересборке, стиль — при отдельной генерации изображения. Готовые материалы сохранены.';
 }
 export async function workerOnline(root = productionRoot()) {
   try { return Date.now() - (await stat(join(root, 'heartbeat'))).mtimeMs < 15000; } catch { return false; }

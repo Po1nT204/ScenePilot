@@ -1,6 +1,7 @@
 'use server';
 import { videoContext } from '@/lib/production/context';
-import { createJob, editJob, listJobs, workerOnline, queueOperation, selectImageProvider } from '@/lib/production/store';
+import { createJob, editJob, listJobs, workerOnline, queueOperation, selectImageProvider, saveAppearance } from '@/lib/production/store';
+import { imagePrompt } from '@/lib/production/visual-style';
 import { publicJob, createsMaterials, requiredProviders, neededImageProviders, productionLimits, type VideoOperation } from '@/lib/production/model';
 import { providerConfig } from '@/lib/production/providers';
 import { checkSpeechConnection } from '@/lib/production/connection';
@@ -53,12 +54,18 @@ export async function saveVideoPrompts(projectId: string, versionId: string, id:
       for (const shot of job.shots) {
         const input = prompts.find(p => p.id === shot.id);
         if (!input || typeof input.prompt !== 'string' || !input.prompt.trim() || input.prompt.length > productionLimits.prompt) throw new Error(`Описание кадра должно содержать от 1 до ${productionLimits.prompt} символов.`);
+        if (imagePrompt(input.prompt.trim(), job.visualStyle).length > productionLimits.prompt) throw new Error('Описание вместе с выбранным стилем превышает 2000 символов. Сократите описание.');
         shot.prompt = input.prompt.trim();
       }
       job.message = 'Описания сохранены. Изображения не перегенерировались.';
     });
     return { job: publicJob(job) };
   } catch (e) { return { error: message(e) }; }
+}
+export async function saveVideoAppearance(projectId: string, versionId: string, id: string, revision: number, style: string, subtitles: boolean) {
+  const { scope } = await videoContext(projectId, versionId);
+  try { return { job: publicJob(await editJob(id, scope, revision, job => saveAppearance(job, style, subtitles))) }; }
+  catch (e) { return { error: message(e) }; }
 }
 export async function startVideoOperation(projectId: string, versionId: string, id: string, revision: number, kind: VideoOperation['kind'], budgetUSD: number, paidConfirmed: boolean, shotId?: string) {
   const { scope } = await videoContext(projectId, versionId);

@@ -7,6 +7,7 @@ import { imageAdapter } from './image-registry';
 import type { ImageAdapter, ImageResult } from './image-adapter';
 import { imageCatalog, selectedImageProvider, type ImageProviderId } from './image-catalog';
 import { renderVideo } from './render';
+import { imagePrompt } from './visual-style';
 
 export type ProductionServices = {
   config: ProviderConfig; speech: typeof synthesize; image: (id: ImageProviderId) => ImageAdapter;
@@ -69,10 +70,12 @@ export async function processJob(job: VideoJob, root: string, deps: ProductionSe
           const provider = selectedImageProvider(job);
           if (provider === 'none') throw new Error('Выберите модуль изображений перед генерацией.');
           job.message = `${imageCatalog[provider].label}: кадр ${job.shots.indexOf(shot) + 1} из ${job.shots.length}`;
-          shot.image.requestedPrompt = shot.prompt;
+          const prompt = imagePrompt(shot.prompt, job.visualStyle);
+          if (prompt.length > 2000) throw new Error('Описание со стилем превышает 2000 символов. Сократите описание кадра.');
+          shot.image.requestedPrompt = prompt;
           shot.image.requestedProvider = provider;
           await reserve('image', shot.image, shot.id, provider);
-          const submitted = await deps.image(provider).submit(shot.prompt);
+          const submitted = await deps.image(provider).submit(prompt);
           if (submitted.pending) { Object.assign(shot.image, submitted.task, { state: 'pending' }); await persist(); }
           else await saveImage(submitted, provider);
         }

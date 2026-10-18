@@ -1,5 +1,6 @@
 // Shared, serializable production data. No credentials or filesystem paths here.
 import { imagePrice, selectedImageProvider, type ImageSelection, type ImageProviderId } from './image-catalog';
+import type { VisualStyle } from './visual-style';
 export const productionLimits = { characters: 5000, shots: 12, prompt: 2000 } as const;
 export const productionRates = { speechPerThousand: 0.08, image: 0.04, checked: '2026-10-18' } as const;
 export type Alignment = { characters: string[]; character_start_times_seconds: number[]; character_end_times_seconds: number[] };
@@ -17,6 +18,8 @@ export type VideoJob = {
   status: 'draft' | 'queued' | 'running' | 'materials' | 'ready' | 'failed';
   message: string; shots: VideoShot[]; audio: Asset; alignment?: Alignment;
   imageProvider?: ImageSelection;
+  visualStyle?: VisualStyle;
+  subtitlesEnabled?: boolean;
   output?: string; subtitles?: string; outputStale: boolean;
   operation?: VideoOperation;
   attempts: { id: string; kind: 'speech' | 'image'; shotId?: string; provider?: ImageProviderId; model?: string; estimatedUSD: number; at: string }[];
@@ -35,12 +38,32 @@ export function validateNarration(script: string) {
 }
 export function planShots(script: string, count = 6): Omit<VideoShot, 'id'>[] {
   const text = validateNarration(script);
-  const words = text.split(' ');
-  const size = Math.ceil(words.length / Math.max(1, Math.min(productionLimits.shots, count)));
+  const target = Number.isFinite(count) ? Math.max(1, Math.min(productionLimits.shots, Math.floor(count))) : 6;
+  // Prefer complete sentences. Long unpunctuated passages can still split at words.
+  const units: string[] = [];
+  for (const sentence of new Intl.Segmenter(undefined, { granularity: 'sentence' }).segment(text)) {
+    let part = '';
+    for (const word of sentence.segment.trim().split(' ')) {
+      if (part && part.length + word.length + 1 > 900) { units.push(part); part = ''; }
+      part += (part ? ' ' : '') + word;
+    }
+    if (part) units.push(part);
+  }
+  const groups: string[] = [];
+  let group = '';
+  let consumed = 0;
+  for (let i = 0; i < units.length; i++) {
+    group += (group ? ' ' : '') + units[i];
+    const remainingGroups = Math.min(target - groups.length, units.length - i + (group ? 0 : 1));
+    const desired = (text.length - consumed) / Math.max(1, remainingGroups);
+    if (i === units.length - 1 || (groups.length < target - 1 &&
+      (units.length - i - 1 <= target - groups.length - 1 || Math.abs(group.length - desired) <= Math.abs(group.length + 1 + units[i + 1].length - desired)))) {
+      groups.push(group); consumed += group.length + 1; group = '';
+    }
+  }
   let start = 0;
   const shots: Omit<VideoShot, 'id'>[] = [];
-  for (let i = 0; i < words.length; i += size) {
-    const part = words.slice(i, i + size).join(' ');
+  for (const part of groups) {
     shots.push({ text: part, start, end: start + part.length,
       prompt: `Cinematic editorial illustration, coherent realistic style, landscape composition, no text or watermark. Depict this part of the story: ${part}`.slice(0, productionLimits.prompt), image: { state: 'empty' } });
     start += part.length + 1;

@@ -55,7 +55,7 @@ export async function renderVideo(job: VideoJob, root: string, progress: (text: 
     await progress('Соединение кадров, озвучки и субтитров');
     await atomicWrite(join(cwd, concat), parts.map(p => `file '${p}'`).join('\n'));
     await runProgram(ffmpeg, ['-hide_banner', '-loglevel', 'error', '-nostdin', '-n', '-f', 'concat', '-safe', '1', '-i', concat, '-i', job.audio.file!,
-      '-map', '0:v:0', '-map', '1:a:0', '-vf', `subtitles=${srt}:force_style='FontName=Arial,FontSize=22,Outline=2,Shadow=0,MarginV=24'`,
+      '-map', '0:v:0', '-map', '1:a:0', ...(job.subtitlesEnabled === false ? [] : ['-vf', `subtitles=${srt}:force_style='FontName=Arial,FontSize=22,Outline=2,Shadow=0,MarginV=24'`]),
       '-af', 'apad', '-t', String(duration), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-threads', '2', '-filter_threads', '1',
       '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', output], cwd);
     if ((await stat(join(cwd, output))).size < 1000) throw new Error('Получен пустой видеофайл.');
