@@ -1,13 +1,13 @@
 // Shared, serializable production data. No credentials or filesystem paths here.
 export const productionLimits = { characters: 5000, shots: 12, prompt: 2000 } as const;
-export const productionRates = { speechPerThousand: 0.08, image: 0.04, checked: '2026-10-17' } as const;
+export const productionRates = { speechPerThousand: 0.08, image: 0.04, checked: '2026-10-18' } as const;
 export type Alignment = { characters: string[]; character_start_times_seconds: number[]; character_end_times_seconds: number[] };
 export type Asset = {
   state: 'empty' | 'requesting' | 'pending' | 'ready' | 'unknown' | 'failed';
   file?: string; requestId?: string; pollingUrl?: string; generatedPrompt?: string; requestedPrompt?: string;
 };
 export type VideoShot = { id: string; text: string; start: number; end: number; prompt: string; image: Asset };
-export type VideoOperation = { kind: 'generate' | 'replace' | 'render' | 'check'; shotId?: string; budgetUSD: number; reservedUSD: number };
+export type VideoOperation = { kind: 'generate' | 'speech' | 'replace' | 'render' | 'check'; shotId?: string; budgetUSD: number; reservedUSD: number };
 export type VideoJob = {
   schema: 1; id: string; ownerId: string; projectId: string; versionId: string;
   title: string; script: string; source: string; text: string; voiceId: string;
@@ -20,6 +20,7 @@ export type VideoJob = {
 };
 export type VideoScope = { ownerId: string; projectId: string; versionId: string };
 export type VideoSetup = { enabled: boolean; speech: boolean; images: boolean; workerOnline: boolean };
+export type SpeechConnection = { voiceId: string; voiceName: string; tier: string; remainingCharacters: number; checkedAt: string };
 export type VideoView = Omit<VideoJob, 'alignment' | 'ownerId'>;
 export const normalizeNarration = (text: string) => text.trim().replace(/\s+/gu, ' ');
 export const validVoice = (id: string) => /^[a-zA-Z0-9_-]{5,100}$/.test(id);
@@ -45,12 +46,19 @@ export function planShots(script: string, count = 6): Omit<VideoShot, 'id'>[] {
 export const roundCost = (value: number) => Math.max(0, Math.ceil((value - 1e-10) * 10000) / 10000);
 export function estimatedCost(job: Pick<VideoJob, 'text' | 'audio' | 'shots'>, kind: VideoOperation['kind'], shotId?: string) {
   if (kind === 'render' || kind === 'check') return 0;
+  if (kind === 'speech') return roundCost(job.audio.file ? 0 : job.text.length / 1000 * productionRates.speechPerThousand);
   if (kind === 'replace') {
     if (!job.shots.some(s => s.id === shotId)) throw new Error('Кадр не найден.');
     return productionRates.image;
   }
   const images = job.shots.filter(s => !s.image.file && s.image.state !== 'pending').length;
   return roundCost((job.audio.file ? 0 : job.text.length / 1000 * productionRates.speechPerThousand) + images * productionRates.image);
+}
+export function requiredProviders(job: Pick<VideoJob, 'audio' | 'shots'>, kind: VideoOperation['kind']) {
+  return {
+    speech: (kind === 'generate' || kind === 'speech') && !job.audio.file,
+    images: kind === 'replace' || kind === 'check' || (kind === 'generate' && job.shots.some(s => !s.image.file || s.image.state === 'pending')),
+  };
 }
 export function assetsReady(job: Pick<VideoJob, 'audio' | 'shots' | 'alignment'>) {
   return !!job.audio.file && !!job.alignment && job.shots.every(s => !!s.image.file);

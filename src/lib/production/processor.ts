@@ -38,7 +38,7 @@ export async function processJob(job: VideoJob, root: string, deps: ProductionSe
       job.output = rendered.output; job.subtitles = rendered.subtitles; job.outputStale = false;
       job.status = 'ready'; job.message = 'Видео готово. Посмотрите и скачайте результат.';
     } else {
-      if (op.kind === 'generate' && !job.audio.file) {
+      if ((op.kind === 'generate' || op.kind === 'speech') && !job.audio.file) {
         if (['requesting', 'unknown'].includes(job.audio.state)) throw new Error('Результат предыдущей озвучки неизвестен. Новый запрос не отправлен.');
         activeAsset = job.audio; job.message = 'ElevenLabs: озвучка и тайминги';
         await reserve('speech', activeAsset);
@@ -48,6 +48,7 @@ export async function processJob(job: VideoJob, root: string, deps: ProductionSe
         job.alignment = result.alignment; job.outputStale = !!job.output; await persist(); activeAsset = undefined;
       }
       for (const shot of job.shots) {
+        if (op.kind === 'speech') break;
         if (op.kind === 'replace' && shot.id !== op.shotId) continue;
         if (op.kind === 'check' && !shot.image.pollingUrl) continue;
         if (op.kind !== 'replace' && shot.image.file && shot.image.state !== 'pending') continue;
@@ -74,7 +75,7 @@ export async function processJob(job: VideoJob, root: string, deps: ProductionSe
         activeAsset = undefined;
       }
       job.status = assetsReady(job) ? 'materials' : 'draft';
-      job.message = assetsReady(job) ? 'Материалы готовы. Прослушайте озвучку и соберите видео.' : 'Состояние обновлено. Недостающие материалы можно создать отдельно.';
+      job.message = op.kind === 'speech' ? 'Озвучка сохранена. Прослушайте её перед созданием изображений.' : assetsReady(job) ? 'Материалы готовы. Прослушайте озвучку и соберите видео.' : 'Состояние обновлено. Недостающие материалы можно создать отдельно.';
     }
   } catch (error) {
     if (activeAsset?.state === 'requesting') activeAsset.state = error instanceof ProviderError && !error.uncertain ? 'failed' : 'unknown';

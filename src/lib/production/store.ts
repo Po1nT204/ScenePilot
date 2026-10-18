@@ -82,11 +82,11 @@ export async function editJob(id: string, scope: VideoScope, revision: number, e
   });
 }
 export function queueOperation(job: VideoJob, operation: VideoOperation, paidConfirmed: boolean) {
-  if (!['generate', 'replace', 'render', 'check'].includes(operation.kind)) throw new Error('Неизвестное действие.');
+  if (!['generate', 'speech', 'replace', 'render', 'check'].includes(operation.kind)) throw new Error('Неизвестное действие.');
   if (operation.kind === 'render' && !assetsReady(job)) throw new Error('Сначала нужны озвучка, тайминги и все изображения.');
-  if (operation.kind === 'generate') {
+  if (operation.kind === 'generate' || operation.kind === 'speech') {
     if (!job.audio.file && ['requesting', 'unknown'].includes(job.audio.state)) throw new Error('Результат запроса озвучки неизвестен. Проверьте биллинг ElevenLabs; для нового запроса создайте отдельную сборку.');
-    if (job.shots.some(s => !s.image.file && !s.image.pollingUrl && ['requesting', 'unknown'].includes(s.image.state))) throw new Error('Результат запроса изображения неизвестен. Новый запрос возможен только отдельной кнопкой замены кадра.');
+    if (operation.kind === 'generate' && job.shots.some(s => !s.image.file && !s.image.pollingUrl && ['requesting', 'unknown'].includes(s.image.state))) throw new Error('Результат запроса изображения неизвестен. Новый запрос возможен только отдельной кнопкой замены кадра.');
   }
   const cost = estimatedCost(job, operation.kind, operation.shotId);
   if (cost > 0 && (!paidConfirmed || !Number.isFinite(operation.budgetUSD) || operation.budgetUSD < cost || operation.budgetUSD > 10)) throw new Error('Подтвердите платные запросы и предел расходов от оценки до $10.');
