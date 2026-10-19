@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile, rename, readdir, open, unlink, stat } from 
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
-import { type VideoJob, type VideoScope, type VideoOperation, planShots, validVoice, validateNarration, assetsReady, estimatedCost, createsImages, createsMaterials } from './model';
+import { type VideoJob, type VideoScope, type VideoOperation, planShots, validVoice, validateNarration, assetsReady, estimatedCost, hasVisual, createsImages, createsMaterials } from './model';
 import { type ImageSelection, validImageSelection, selectedImageProvider } from './image-catalog';
 import { imagePrompt, validVisualStyle } from './visual-style';
 
@@ -76,20 +76,20 @@ export async function createJob(scope: VideoScope, input: { title: string; scrip
     shots: planShots(input.script).map(s => ({ ...s, id: randomUUID() })), audio: { state: 'empty' }, outputStale: false, attempts: [] };
   await mkdir(jobDirectory(job.id, root), { recursive: true }); await saveJob(job, root); return job;
 }
-export async function editJob(id: string, scope: VideoScope, revision: number, edit: (job: VideoJob) => void, root = productionRoot()) {
+export async function editJob(id: string, scope: VideoScope, revision: number, edit: (job: VideoJob) => void | Promise<void>, root = productionRoot()) {
   return withLock(join(jobDirectory(id, root), 'edit.lock'), async () => {
     const job = await readJob(id, root); assertScope(job, scope);
     if (job.revision !== revision) throw new Error('Видео изменилось. Обновите состояние перед действием.');
     if (job.status === 'queued' || job.status === 'running') throw new Error('Дождитесь завершения текущего действия.');
-    edit(job); await saveJob(job, root); return job;
+    await edit(job); await saveJob(job, root); return job;
   });
 }
 export function queueOperation(job: VideoJob, operation: VideoOperation, paidConfirmed: boolean) {
   if (!['generate', 'speech', 'replace', 'render', 'check'].includes(operation.kind)) throw new Error('Неизвестное действие.');
-  if (operation.kind === 'render' && !assetsReady(job)) throw new Error('Сначала нужны озвучка, тайминги и все изображения.');
+  if (operation.kind === 'render' && !assetsReady(job)) throw new Error('Сначала нужны озвучка, тайминги и изображение или клип для каждой сцены.');
   if (operation.kind === 'generate' || operation.kind === 'speech') {
     if (!job.audio.file && ['requesting', 'unknown'].includes(job.audio.state)) throw new Error('Результат запроса озвучки неизвестен. Проверьте биллинг ElevenLabs; для нового запроса создайте отдельную сборку.');
-    if (operation.kind === 'generate' && job.shots.some(s => !s.image.file && !s.image.pollingUrl && ['requesting', 'unknown'].includes(s.image.state))) throw new Error('Результат запроса изображения неизвестен. Новый запрос возможен только отдельной кнопкой замены кадра.');
+    if (operation.kind === 'generate' && job.shots.some(s => !hasVisual(s) && !s.image.pollingUrl && ['requesting', 'unknown'].includes(s.image.state))) throw new Error('Результат запроса изображения неизвестен. Новый запрос возможен только отдельной кнопкой замены кадра.');
   }
   const cost = estimatedCost(job, operation.kind, operation.shotId);
   if (createsImages(job, operation.kind) && selectedImageProvider(job) === 'none') throw new Error('Сначала выберите модуль изображений в этой сборке.');
@@ -120,7 +120,7 @@ export async function workerOnline(root = productionRoot()) {
   try { return Date.now() - (await stat(join(root, 'heartbeat'))).mtimeMs < 15000; } catch { return false; }
 }
 export function assetFile(job: VideoJob, file: string, root = productionRoot()) {
-  const files = [job.audio.file, job.output, job.subtitles, ...job.shots.map(s => s.image.file)];
+  const files = [job.audio.file, job.output, job.subtitles, ...job.shots.flatMap(s => [s.image.file, s.clip?.file])];
   if (!/^[0-9a-f-]+\.(mp3|jpg|png|mp4|srt)$/.test(file) || !files.includes(file)) throw new Error('Материал не найден.');
   return join(jobDirectory(job.id, root), file);
 }

@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { stat, statfs, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
-import { type VideoJob, makeSubtitles, parseAlignment, assetsReady } from './model';
+import { type VideoJob, makeSubtitles, parseAlignment, assetsReady, usesClip } from './model';
 import { atomicWrite, jobDirectory } from './store';
 
 export function runProgram(command: string, args: string[], cwd: string, timeoutMs = 30 * 60 * 1000) {
@@ -48,8 +48,10 @@ export async function renderVideo(job: VideoJob, root: string, progress: (text: 
       if (frames < 1) throw new Error('Тайминг кадра слишком короткий.');
       const part = `${stem}-${i}.mp4`; parts.push(part);
       // One image at a time: bounded memory on a laptop; all filenames are server generated.
-      const filter = `scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1,zoompan=z='1+0.04*on/${frames}':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d=${frames}:s=1280x720:fps=${fps},format=yuv420p`;
-      await runProgram(ffmpeg, ['-hide_banner', '-loglevel', 'error', '-nostdin', '-n', '-i', job.shots[i].image.file!, '-vf', filter,
+      const shot = job.shots[i];
+      const clip = usesClip(shot) ? shot.clip : undefined;
+      const filter = clip ? `fps=${fps},scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1,tpad=stop_mode=clone:stop_duration=${frames / fps},format=yuv420p` : `scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1,zoompan=z='1+0.04*on/${frames}':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d=${frames}:s=1280x720:fps=${fps},format=yuv420p`;
+      await runProgram(ffmpeg, ['-hide_banner', '-loglevel', 'error', '-nostdin', '-n', ...(clip ? ['-protocol_whitelist', 'file,pipe', '-f', 'mov', ...(clip.tail === 'loop' ? ['-stream_loop', '-1'] : [])] : []), '-i', clip?.file || shot.image.file!, '-vf', filter,
         '-frames:v', String(frames), '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-threads', '2', '-filter_threads', '1', part], cwd);
     }
     await progress('Соединение кадров, озвучки и субтитров');

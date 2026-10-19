@@ -9,7 +9,9 @@ export type Asset = {
   file?: string; requestId?: string; pollingUrl?: string; generatedPrompt?: string; requestedPrompt?: string;
   provider?: ImageProviderId; requestedProvider?: ImageProviderId;
 };
-export type VideoShot = { id: string; text: string; start: number; end: number; prompt: string; image: Asset };
+export type VideoShot = { id: string; text: string; start: number; end: number; prompt: string; image: Asset; visual?: 'image' | 'clip'; clip?: { file: string; duration: number; source: 'upload'; tail: 'hold' | 'loop' } };
+export const usesClip = (shot: VideoShot) => shot.visual === 'clip' && !!shot.clip?.file;
+export const hasVisual = (shot: VideoShot) => shot.visual === 'clip' ? !!shot.clip?.file : !!shot.image.file;
 export type VideoOperation = { kind: 'generate' | 'speech' | 'replace' | 'render' | 'check'; shotId?: string; budgetUSD: number; reservedUSD: number };
 export type VideoJob = {
   schema: 1; id: string; ownerId: string; projectId: string; versionId: string;
@@ -78,11 +80,11 @@ export function estimatedCost(job: Pick<VideoJob, 'text' | 'audio' | 'shots' | '
     if (!job.shots.some(s => s.id === shotId)) throw new Error('Кадр не найден.');
     return imagePrice(job);
   }
-  const images = job.shots.filter(s => !s.image.file && s.image.state !== 'pending').length;
+  const images = job.shots.filter(s => !hasVisual(s) && s.image.state !== 'pending').length;
   return roundCost((job.audio.file ? 0 : job.text.length / 1000 * productionRates.speechPerThousand) + images * imagePrice(job));
 }
 export function createsImages(job: Pick<VideoJob, 'shots'>, kind: VideoOperation['kind']) {
-  return kind === 'replace' || (kind === 'generate' && job.shots.some(s => !s.image.file && s.image.state !== 'pending'));
+  return kind === 'replace' || (kind === 'generate' && job.shots.some(s => !hasVisual(s) && s.image.state !== 'pending'));
 }
 export function createsMaterials(job: Pick<VideoJob, 'shots' | 'audio'>, kind: VideoOperation['kind']) {
   return createsImages(job, kind) || ((kind === 'generate' || kind === 'speech') && !job.audio.file);
@@ -99,11 +101,11 @@ export function neededImageProviders(job: Pick<VideoJob, 'shots' | 'imageProvide
 export function requiredProviders(job: Pick<VideoJob, 'audio' | 'shots'>, kind: VideoOperation['kind']) {
   return {
     speech: (kind === 'generate' || kind === 'speech') && !job.audio.file,
-    images: kind === 'replace' || kind === 'check' || (kind === 'generate' && job.shots.some(s => !s.image.file || s.image.state === 'pending')),
+    images: kind === 'replace' || kind === 'check' || (kind === 'generate' && job.shots.some(s => !hasVisual(s) || s.image.state === 'pending')),
   };
 }
 export function assetsReady(job: Pick<VideoJob, 'audio' | 'shots' | 'alignment'>) {
-  return !!job.audio.file && !!job.alignment && job.shots.every(s => !!s.image.file);
+  return !!job.audio.file && !!job.alignment && job.shots.every(hasVisual);
 }
 export function publicJob(job: VideoJob): VideoView {
   // Provider polling URLs can contain signed parameters. Keep them on the server.

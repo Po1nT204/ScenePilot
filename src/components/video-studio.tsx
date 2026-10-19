@@ -1,8 +1,9 @@
 'use client';
 import { useCallback, useEffect, useState, useTransition } from 'react';
 import Image from 'next/image';
-import { type VideoView, type VideoSetup, type VideoOperation, type SpeechConnection, estimatedCost, requiredProviders, createsMaterials, createsImages, neededImageProviders, productionRates, productionLimits, normalizeNarration } from '@/lib/production/model';
-import { newVideo, saveVideoPrompts, startVideoOperation, videoState, checkVideoSpeechConnection, checkVideoImageConnection, saveVideoImageProvider, saveVideoAppearance } from '@/app/projects/[id]/video/actions';
+import { RunwayConnection } from './runway-connection';
+import { type VideoView, type VideoSetup, type VideoOperation, type SpeechConnection, hasVisual, usesClip, estimatedCost, requiredProviders, createsMaterials, createsImages, neededImageProviders, productionRates, productionLimits, normalizeNarration } from '@/lib/production/model';
+import { newVideo, saveVideoPrompts, startVideoOperation, videoState, checkVideoSpeechConnection, checkVideoImageConnection, saveVideoImageProvider, saveVideoAppearance, saveVideoVisual } from '@/app/projects/[id]/video/actions';
 import { visualStyles, imagePrompt, type VisualStyle } from '@/lib/production/visual-style';
 
 import { imageCatalog, selectedImageProvider, imagePrice, type ImageProviderId, type ImageSelection } from '@/lib/production/image-catalog';
@@ -124,6 +125,29 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
       } catch { setError('Не удалось сохранить оформление. Обновите состояние перед повтором.'); }
     });
   }
+  function uploadClip(shotId: string, file?: File) {
+    if (!job || !file || busy || dirty) return;
+    if (file.size > 32 * 1024 * 1024) { setError('Выберите MP4 не больше 32 МиБ.'); return; }
+    startTransition(async () => {
+      setError('');
+      try {
+        const query = new URLSearchParams({ version: versionId, revision: String(job.revision), shot: shotId });
+        const response = await fetch(`/projects/${projectId}/video/clips/${job.id}?${query}`, { method: 'POST', headers: { 'Content-Type': 'video/mp4' }, body: file });
+        const result = await response.json();
+        if (result.error) setError(result.error); else if (result.job) putJob(result.job); else setError('Не удалось загрузить клип. Обновите состояние.');
+      } catch { setError('Не удалось подтвердить загрузку. Обновите состояние перед повтором.'); }
+    });
+  }
+  function changeVisual(shotId: string, visual: string, tail: string) {
+    if (!job || busy || dirty) return;
+    startTransition(async () => {
+      setError('');
+      try {
+        const result = await saveVideoVisual(projectId, versionId, job.id, job.revision, shotId, visual, tail);
+        if (result.error) setError(result.error); else putJob(result.job!);
+      } catch { setError('Не удалось сохранить выбор материала. Обновите состояние.'); }
+    });
+  }
   return <section className="video-studio" aria-label="Производство видео">
     <div className="video-studio-heading"><div><p className="eyebrow">ОТ СЦЕНАРИЯ К РОЛИКУ</p><h2>Соберите свою историю</h2><p>Озвучка, кадры и субтитры — в одном видео.</p></div><span className="video-pill">MP4 · 720p · 16:9</span></div>
     {error && <p className="video-alert" role="alert">{error}</p>}
@@ -140,7 +164,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
         <option value="none">Выберите сервис — без автоматического выбора</option>
         {Object.entries(imageCatalog).map(([id, info]) => <option key={id} value={id}>{info.label}{info.estimatedUSD === 0 ? ' · бесплатная Beta' : ' · платный API'}</option>)}
       </select>
-      <p className="video-muted">Выбор меняет только будущие запросы. Озвучка и готовые кадры сохраняются. Незавершённые задачи проверяются у исходного сервиса. Видеоанимация Veo / Runway / Seedance пока не подключена; подписка на сайт не заменяет API-доступ.</p>
+      <p className="video-muted">Выбор меняет только будущие запросы. Озвучка и готовые кадры сохраняются. Незавершённые задачи проверяются у исходного сервиса. Для Runway ниже есть отдельное подключение аккаунта подписки. Автоматическая видеоанимация пока не включена.</p>
       {providerInfo && <><p>{providerInfo.terms} <a href={providerInfo.url} target="_blank" rel="noreferrer">Условия сервиса</a></p>
         <p className="video-muted">В .env.local: {providerInfo.setup}. После изменения ключей перезапустите приложение и обработчик. {provider === 'cloudflare-sdxl' ? 'Cloudflare → Workers AI → Use REST API: создайте токен Workers AI Read/Edit и скопируйте Account ID. Пополнять BFL не требуется.' : 'Нужен собственный API-ключ и баланс BFL.'}</p>
         <button type="button" className="button secondary" disabled={!!busy || provider === 'none' || !imageConfigured(provider)} onClick={checkImages}>Проверить {provider === 'cloudflare-sdxl' ? 'Cloudflare' : 'BFL'} · без генерации</button>
@@ -148,6 +172,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
       </>}
       {checkedImage && <div role="status"><p>{checkedImage.message}{checkedImage.credits !== undefined && <> Баланс: <strong>{checkedImage.credits.toLocaleString('ru-RU')} кредитов</strong>.</>} Проверено: {new Date(checkedImage.checkedAt).toLocaleTimeString('ru-RU')}.</p></div>}
     </details>
+    <RunwayConnection projectId={projectId} versionId={versionId} disabled={!!busy || dirty} />
     <div className="video-studio-grid">
       <aside className="video-panel video-brief">
         <p className="eyebrow">01 / СЦЕНАРИЙ</p><h3>Основа ролика</h3>
@@ -172,11 +197,24 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
           <p className="video-muted">Стиль сохраняется сразу и применяется к новым запросам. Готовые картинки остаются прежними. Для сравнения замените один кадр. Стиль не гарантирует реализм или одинаковые лица.</p>
         </div>}
         {!job ? <div className="video-empty"><span className="video-empty-number">01 — 06</span><h4>Здесь появятся кадры</h4><p>Подготовьте план из сценария. Затем создайте изображения и озвучку.</p></div> : <ol className="video-shot-list">{job.shots.map((shot, index) => <li className="video-shot" key={shot.id}>
-          <div className="video-shot-image">{shot.image.file ? <Image unoptimized width={1280} height={720} src={assetURL(shot.image.file)} alt={`Изображение кадра ${index + 1}`} /> : <span>КАДР {String(index + 1).padStart(2, '0')}<small>{shot.image.state === 'pending' ? 'Обрабатывается сервисом' : shot.image.state === 'unknown' ? 'Результат запроса неизвестен' : 'Изображение ещё не создано'}</small></span>}</div>
+          <div className="video-shot-image">{usesClip(shot) ? <video style={{ width: '100%', height: '100%', objectFit: 'contain' }} controls muted preload="metadata" src={assetURL(shot.clip!.file)} aria-label={`Клип сцены ${index + 1}`} /> : shot.image.file ? <Image unoptimized width={1280} height={720} src={assetURL(shot.image.file)} alt={`Изображение кадра ${index + 1}`} /> : <span>КАДР {String(index + 1).padStart(2, '0')}<small>{shot.image.state === 'pending' ? 'Обрабатывается сервисом' : shot.image.state === 'unknown' ? 'Результат запроса неизвестен' : 'Изображение ещё не создано'}</small></span>}</div>
           <div className="video-shot-copy"><p>{shot.text}</p><details><summary>Описание изображения</summary><label className="sr-only" htmlFor={`prompt-${shot.id}`}>Описание кадра {index + 1}</label><textarea id={`prompt-${shot.id}`} rows={4} maxLength={productionLimits.prompt} value={drafts[shot.id] ?? shot.prompt} disabled={!!busy} onChange={e => { if (!dirty) setDraftRevision(job.revision); setDrafts(old => ({ ...old, [shot.id]: e.target.value })); }} /></details>
             {job.visualStyle && job.visualStyle !== 'original' && <details><summary>Запрос со стилем</summary><p className="video-muted">{imagePrompt(drafts[shot.id] ?? shot.prompt, job.visualStyle)}</p></details>}
-            {shot.image.file && <small className="video-muted">Источник: {imageCatalog[shot.image.provider || 'bfl-flux11'].label}{shot.image.generatedPrompt !== imagePrompt(shot.prompt, job.visualStyle) ? ' · описание или стиль изменены после генерации' : ''}</small>}
+            {!usesClip(shot) && shot.image.file && <small className="video-muted">Источник: {imageCatalog[shot.image.provider || 'bfl-flux11'].label}{shot.image.generatedPrompt !== imagePrompt(shot.prompt, job.visualStyle) ? ' · описание или стиль изменены после генерации' : ''}</small>}
             <button type="button" className="video-text-button" disabled={!!busy || dirty || !canImage || ['pending', 'requesting'].includes(shot.image.state)} onClick={() => operate('replace', shot.id)}>{shot.image.file || shot.image.state === 'unknown' || shot.image.state === 'failed' ? 'Новое изображение' : 'Создать этот кадр'} · ≈ {usd(imagePrice(job))}</button>
+            <details><summary>{shot.clip ? 'Клип и монтаж сцены' : 'Добавить MP4-клип'}</summary>
+              <p className="video-muted">Готовое видео из Runway, Veo или другого источника. До 32 МиБ, 60 секунд и 4096 × 4096. Файл копируется на компьютер; загрузка не вызывает генерацию.</p>
+              <label htmlFor={`clip-${shot.id}`}>{shot.clip ? 'Заменить клип' : 'Выбрать MP4'}</label>
+              <input id={`clip-${shot.id}`} type="file" accept="video/mp4,.mp4" disabled={!!busy || dirty} onChange={e => { uploadClip(shot.id, e.target.files?.[0]); e.target.value = ''; }} />
+              {shot.clip && <>
+                <p className="video-muted">Источник: загруженный MP4 · {shot.clip.duration.toFixed(1)} с. Звук клипа исключается, остаётся озвучка. Края обрезаются до 16:9; длинный клип обрезается по сцене.</p>
+                <label htmlFor={`visual-${shot.id}`}>Материал в сборке</label>
+                <select id={`visual-${shot.id}`} value={shot.visual ?? 'image'} disabled={!!busy || dirty} onChange={e => changeVisual(shot.id, e.target.value, shot.clip!.tail)}><option value="image">Изображение</option><option value="clip">MP4-клип</option></select>
+                <label htmlFor={`tail-${shot.id}`}>Если клип короче сцены</label>
+                <select id={`tail-${shot.id}`} value={shot.clip.tail} disabled={!!busy || dirty} onChange={e => changeVisual(shot.id, shot.visual ?? 'image', e.target.value)}><option value="hold">Задержать последний кадр</option><option value="loop">Повторять клип</option></select>
+                <a className="video-text-button" href={assetURL(shot.clip.file, true)}>Скачать исходный клип</a>
+              </>}
+            </details>
             {shot.image.state === 'unknown' && <small className="video-muted">Результат прошлого запроса неизвестен. Новое изображение — отдельный запрос с расходом квоты или денег; сначала проверьте историю исходного сервиса.</small>}
           </div>
         </li>)}</ol>}
@@ -185,7 +223,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
         <p className="eyebrow">03 / ВИДЕО</p><h3>Посмотрите результат</h3>
         <div className="video-preview">{job?.output ? <video key={job.output} controls preload="metadata" src={assetURL(job.output)} aria-label="Собранное видео" /> : <div><span aria-hidden="true">▷</span><p>Здесь будет ваш ролик</p><small>Изображения с движением, голос и субтитры</small></div>}</div>
         {job && <><p className="video-status" role="status"><strong>{statusLabel[job.status]}</strong><br />{job.message}</p>
-          <p className="video-muted">Озвучка: {job.audio.file ? 'сохранена' : 'ещё не готова'} · изображения: {job.shots.filter(s => s.image.file).length} из {job.shots.length} сохранено.</p>
+          <p className="video-muted">Озвучка: {job.audio.file ? 'сохранена' : 'ещё не готова'} · сцены с материалом: {job.shots.filter(hasVisual).length} из {job.shots.length} сохранено.</p>
           {job.outputStale && <p className="video-alert">Материалы или оформление изменены. В проигрывателе предыдущая сборка; соберите видео заново.</p>}
           {job.audio.file && <div className="video-audio"><label>Озвучка · ElevenLabs</label><audio controls preload="metadata" src={assetURL(job.audio.file)} /><a className="video-text-button" href={assetURL(job.audio.file, true)}>Скачать озвучку MP3</a></div>}
           {provider === 'cloudflare-sdxl' && <p className="video-muted">Картинки SDXL: $0 по текущей Beta-цене Cloudflare. Нулевая оценка не гарантирует доступность модели; при ошибке платная замена автоматически не включается.</p>}
@@ -197,8 +235,8 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
           {job.shots.some(s => s.image.state === 'pending') && <button type="button" className="button secondary" disabled={!!busy || dirty || !setup.workerOnline || !neededImageProviders(job, 'check').every(imageConfigured)} onClick={() => operate('check')}>Проверить задачи изображений · без новой генерации</button>}
           <label className="video-consent"><input id="video-subtitles" type="checkbox" checked={job.subtitlesEnabled ?? true} disabled={!!busy || dirty} onChange={e => changeAppearance(job.visualStyle ?? 'original', e.target.checked)} />Субтитры в готовом видео</label>
           <p className="video-muted">Выбор сохраняется сразу. Изменится следующий MP4 после пересборки; озвучка и изображения используются повторно.</p>
-          <button type="button" className="button secondary" disabled={!!busy || dirty || !setup.workerOnline || !job.audio.file || job.shots.some(s => !s.image.file)} onClick={() => operate('render')}>Собрать MP4 на компьютере</button>
-          <p className="video-muted">{!job.audio.file || job.shots.some(s => !s.image.file) ? 'Для MP4 нужны сохранённая озвучка и все изображения.' : 'Материалы сохранены — можно собрать MP4.'} Монтаж выполняется локально, без новых запросов генерации.</p>
+          <button type="button" className="button secondary" disabled={!!busy || dirty || !setup.workerOnline || !job.audio.file || job.shots.some(s => !hasVisual(s))} onClick={() => operate('render')}>Собрать MP4 на компьютере</button>
+          <p className="video-muted">{!job.audio.file || job.shots.some(s => !hasVisual(s)) ? 'Для MP4 нужны озвучка и изображение или клип в каждой сцене.' : 'Материалы сохранены — можно собрать MP4.'} Монтаж выполняется локально, без новых запросов генерации.</p>
           {job.output && <a className="button secondary" href={assetURL(job.output, true)}>Скачать MP4</a>}
           <button type="button" className="video-text-button" onClick={() => void refresh()}>Обновить состояние</button>
         </>}

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import { type VideoJob, type Asset, productionRates, assetsReady, roundCost } from './model';
+import { type VideoJob, type Asset, productionRates, usesClip, assetsReady, roundCost } from './model';
 import { atomicWrite, jobDirectory, saveJob } from './store';
 import { synthesize, ProviderError, type ProviderConfig } from './providers';
 import { imageAdapter } from './image-registry';
@@ -53,6 +53,7 @@ export async function processJob(job: VideoJob, root: string, deps: ProductionSe
       }
       for (const shot of job.shots) {
         if (op.kind === 'speech') break;
+        if (op.kind === 'generate' && usesClip(shot) && shot.image.state !== 'pending' && !shot.image.pollingUrl) continue;
         if (op.kind === 'replace' && shot.id !== op.shotId) continue;
         if (op.kind === 'check' && shot.image.state !== 'pending' && !shot.image.pollingUrl) continue;
         if (op.kind !== 'replace' && shot.image.file && shot.image.state !== 'pending') continue;

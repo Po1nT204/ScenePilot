@@ -5,8 +5,9 @@ import { mkdtemp, rm, readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { createJob, jobDirectory } from '../src/lib/production/store';
+import { createJob, jobDirectory, saveJob, readJob } from '../src/lib/production/store';
 import { renderVideo, runProgram } from '../src/lib/production/render';
+import { importClip, selectVisual } from '../src/lib/production/clips';
 
 test('real FFmpeg renders mixed JPEG/PNG, probes and decodes an MP4 with subtitles and audio', { timeout: 120000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'scenepilot-render-'));
@@ -34,6 +35,27 @@ test('real FFmpeg renders mixed JPEG/PNG, probes and decodes an MP4 with subtitl
       await runProgram(ffmpeg, ['-v', 'error', '-ss', '0.3', '-i', file, '-frames:v', '1', '-vf', 'crop=1280:220:0:500', '-f', 'md5', `${name}.md5`], cwd, 30000);
     }
     assert.notEqual(await readFile(join(cwd, 'captions.md5'), 'utf8'), await readFile(join(cwd, 'clean.md5'), 'utf8'));
+    await saveJob(job, root);
+    await runProgram(ffmpeg, ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=320x180:rate=24:duration=0.25', '-f', 'lavfi', '-i', 'sine=frequency=880:duration=0.25', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', 'clip.mp4'], cwd, 30000);
+    const clipBytes = await readFile(join(cwd, 'clip.mp4'));
+    const scope = { ownerId: job.ownerId, projectId: job.projectId, versionId: job.versionId };
+    await assert.rejects(importClip(job.id, { ...scope, ownerId: randomUUID() }, job.revision, job.shots[0].id, clipBytes, root), /недоступно/);
+    const mixed = await importClip(job.id, scope, job.revision, job.shots[0].id, clipBytes, root);
+    assert.equal(mixed.shots[0].image.file, job.shots[0].image.file);
+    assert.equal(mixed.audio.file, job.audio.file);
+    assert.equal((await readJob(job.id, root)).shots[0].clip?.source, 'upload');
+    const held = await renderVideo(mixed, root, async () => {});
+    selectVisual(mixed, mixed.shots[0].id, 'clip', 'loop');
+    const looped = await renderVideo(mixed, root, async () => {});
+    for (const [name, file] of [['held', held.output], ['looped', looped.output]]) {
+      await runProgram(ffmpeg, ['-v', 'error', '-i', file, '-f', 'null', '-'], cwd, 30000);
+      await runProgram(ffmpeg, ['-v', 'error', '-ss', '0.45', '-i', file, '-frames:v', '1', '-f', 'md5', `${name}.md5`], cwd, 30000);
+      await runProgram(ffmpeg, ['-v', 'error', '-i', file, '-map', '0:a:0', '-f', 'md5', `${name}-audio.md5`], cwd, 30000);
+    }
+    assert.notEqual(await readFile(join(cwd, 'held.md5'), 'utf8'), await readFile(join(cwd, 'looped.md5'), 'utf8'));
+    assert.equal(await readFile(join(cwd, 'held-audio.md5'), 'utf8'), await readFile(join(cwd, 'looped-audio.md5'), 'utf8'));
+    await runProgram(ffmpeg, ['-v', 'error', '-i', clean.output, '-map', '0:a:0', '-f', 'md5', 'clean-audio.md5'], cwd, 30000);
+    assert.equal(await readFile(join(cwd, 'clean-audio.md5'), 'utf8'), await readFile(join(cwd, 'held-audio.md5'), 'utf8'));
     assert.ok(!(await readdir(cwd)).some(name => name.endsWith('.txt')));
   } finally { await rm(root, { recursive: true, force: true }); }
 });

@@ -17,8 +17,31 @@ import { imageCatalog, selectedImageProvider } from '../src/lib/production/image
 import { neededImageProviders } from '../src/lib/production/model';
 import { imagePrompt } from '../src/lib/production/visual-style';
 import { saveAppearance } from '../src/lib/production/store';
+import { selectVisual, importClip } from '../src/lib/production/clips';
+import { assetsReady } from '../src/lib/production/model';
 
 const scope = { ownerId: randomUUID(), projectId: randomUUID(), versionId: randomUUID() };
+
+test('active clips replace missing pictures in budget/readiness and generation, keep images and obey revision/owner', async () => sandbox(async root => {
+  const job = await createJob(scope, input, root);
+  job.audio = { file: `${randomUUID()}.mp3`, state: 'ready' }; job.alignment = alignment(job.text);
+  for (const shot of job.shots) {
+    shot.clip = { file: `${randomUUID()}.mp4`, duration: 3, source: 'upload', tail: 'hold' };
+    selectVisual(job, shot.id, 'clip', 'hold');
+    assert.equal(assetFile(job, shot.clip.file, root), join(jobDirectory(job.id, root), shot.clip.file));
+  }
+  assert.equal(estimatedCost(job, 'generate'), 0); assert.equal(assetsReady(job), true);
+  assert.deepEqual(requiredProviders(job, 'generate'), { speech: false, images: false });
+  queueOperation(job, { kind: 'generate', budgetUSD: 0, reservedUSD: 0 }, false);
+  const calls: string[] = []; await processJob(job, root, fakeServices(calls)); assert.deepEqual(calls, []);
+  job.output = `${randomUUID()}.mp4`;
+  selectVisual(job, job.shots[0].id, 'image', 'loop');
+  assert.equal(assetsReady(job), false); assert.equal(job.outputStale, true); assert.ok(job.shots[0].clip);
+  assert.ok(estimatedCost(job, 'generate') > 0);
+  await assert.rejects(editJob(job.id, { ...scope, ownerId: randomUUID() }, job.revision, j => selectVisual(j, j.shots[0].id, 'clip', 'loop'), root), /недоступно/);
+  await assert.rejects(editJob(job.id, scope, 0, j => selectVisual(j, j.shots[0].id, 'clip', 'loop'), root), /изменилось/);
+  await assert.rejects(importClip(job.id, scope, job.revision, job.shots[0].id, Buffer.from('not an MP4 file'), root), /Нужен MP4/);
+}));
 const input = { title: 'Pilot', script: 'A quiet city. The sun rises. People open their windows.', source: 'manual', voiceId: 'testVoice', imageProvider: 'bfl-flux11' as const };
 function alignment(text: string): Alignment {
   return { characters: text.split(''), character_start_times_seconds: text.split('').map((_, i) => i * 0.05), character_end_times_seconds: text.split('').map((_, i) => (i + 1) * 0.05) };

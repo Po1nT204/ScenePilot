@@ -1,5 +1,6 @@
 'use server';
 import { videoContext } from '@/lib/production/context';
+import { selectVisual } from '@/lib/production/clips';
 import { createJob, editJob, listJobs, workerOnline, queueOperation, selectImageProvider, saveAppearance } from '@/lib/production/store';
 import { imagePrompt } from '@/lib/production/visual-style';
 import { publicJob, createsMaterials, requiredProviders, neededImageProviders, productionLimits, type VideoOperation } from '@/lib/production/model';
@@ -65,6 +66,11 @@ export async function saveVideoPrompts(projectId: string, versionId: string, id:
 export async function saveVideoAppearance(projectId: string, versionId: string, id: string, revision: number, style: string, subtitles: boolean) {
   const { scope } = await videoContext(projectId, versionId);
   try { return { job: publicJob(await editJob(id, scope, revision, job => saveAppearance(job, style, subtitles))) }; }
+  catch (e) { return { error: message(e) }; }
+}
+export async function saveVideoVisual(projectId: string, versionId: string, id: string, revision: number, shotId: string, visual: string, tail: string) {
+  const { scope } = await videoContext(projectId, versionId);
+  try { return { job: publicJob(await editJob(id, scope, revision, job => selectVisual(job, shotId, visual, tail))) }; }
   catch (e) { return { error: message(e) }; }
 }
 export async function startVideoOperation(projectId: string, versionId: string, id: string, revision: number, kind: VideoOperation['kind'], budgetUSD: number, paidConfirmed: boolean, shotId?: string) {
