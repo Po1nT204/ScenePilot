@@ -655,3 +655,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid #b35a28; outline-
 .channel-profile-picker select { width: 100%; min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 6px; background: #fffefa; font: inherit; }
 .project-form > h2 + .field-hint { margin-top: 8px; }
 .project-form .scene-toolbar + .field-hint { margin-top: 8px; }
+.channel-quality-builder { border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 20px; }
+.channel-quality-builder summary { cursor: pointer; font-weight: 600; }
+.channel-quality-builder p { line-height: 1.6; }
+.channel-quality-builder .project-full-topic { padding: 12px; background: #eef0e8; border-radius: 6px; }

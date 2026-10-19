@@ -127,3 +127,50 @@ test("profile selection rejects forged ids and missing or mismatched revision me
     assert.throws(() => channelSelection(key, revision));
   }
 });
+
+import { hookOptions, retentionOptions, endingOptions, qualityRecipe, appendQualityRecipe } from '../src/lib/content-quality';
+
+test('all writing recipes fit profile format and survive snapshot/export without new fields', () => {
+  for (const hook of Object.keys(hookOptions) as (keyof typeof hookOptions)[]) {
+    for (const retention of Object.keys(retentionOptions) as (keyof typeof retentionOptions)[]) {
+      for (const ending of Object.keys(endingOptions) as (keyof typeof endingOptions)[]) {
+        const recipe = qualityRecipe(hook, retention, ending);
+        const merged = appendQualityRecipe('Documentary', recipe, channelLimits.format);
+        assert.equal(merged.error, undefined);
+        const snapshot = channelSnapshot({ ...profile, format: merged.value });
+        assert.equal(snapshot?.format, `Documentary\n\n${recipe}`);
+        assert.equal(channelProjectDefaults(snapshot).genre, '');
+      }
+    }
+  }
+});
+
+test('adding quality instructions preserves existing work, prevents duplicates and rejects overflow intact', () => {
+  const recipe = qualityRecipe('question', 'explain', 'answer');
+  assert.equal(appendQualityRecipe('', recipe, recipe.length).value, recipe);
+  const current = 'Custom requirements';
+  const merged = appendQualityRecipe(current, recipe, 1000);
+  assert.ok(merged.value.startsWith(current));
+  assert.ok(appendQualityRecipe(merged.value, recipe, 1000).error);
+  const full = 'x'.repeat(1000);
+  const rejected = appendQualityRecipe(full, recipe, 1000);
+  assert.ok(rejected.error);
+  assert.equal(rejected.value, full);
+});
+
+test('script request carries chosen writing recipe and retention guidance in one call without changing output contract', async () => {
+  const format = qualityRecipe('moment', 'story', 'reflection');
+  let calls = 0;
+  const result = await requestYandexScript(config, { ...brief, channel: { ...profile, format } }, async (_url, init) => {
+    calls++;
+    const body = JSON.parse(String(init?.body));
+    assert.equal(JSON.parse(body.messages[1].text).channel.format, format);
+    assert.match(body.messages[0].text, /выполни обещание начала/i);
+    assert.match(body.messages[0].text, /не откладывай все ответы/i);
+    assert.equal(body.completionOptions.maxTokens, '2000');
+    assert.equal(body.jsonObject, undefined);
+    return complete('Finished narration');
+  });
+  assert.equal(calls, 1);
+  assert.equal(result.content, 'Finished narration');
+});
