@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseConfig } from "@/lib/supabase/config";
+import { supabaseTransport } from '@/lib/supabase/network';
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -8,6 +9,7 @@ export async function proxy(request: NextRequest) {
   if (!config) return response;
 
   const supabase = createServerClient(config.url, config.key, {
+    global: { fetch: supabaseTransport() },
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll(cookiesToSet) {

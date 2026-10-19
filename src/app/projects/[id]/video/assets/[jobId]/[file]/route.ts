@@ -3,6 +3,8 @@ import { stat } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { videoContext } from '@/lib/production/context';
 import { readJob, assertScope, assetFile } from '@/lib/production/store';
+import { unstable_rethrow } from 'next/navigation';
+import { VideoAccessError } from '@/lib/production/access-error';
 import { byteRange } from '@/lib/production/range';
 
 export const runtime = 'nodejs';
@@ -10,8 +12,8 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request, { params }: { params: Promise<{ id: string; jobId: string; file: string }> }) {
   const { id, jobId, file } = await params;
   const url = new URL(request.url);
-  const { scope } = await videoContext(id, url.searchParams.get('version') || '');
   try {
+    const { scope } = await videoContext(id, url.searchParams.get('version') || '');
     const job = await readJob(jobId); assertScope(job, scope);
     const path = assetFile(job, file), info = await stat(path);
     const range = byteRange(request.headers.get('range'), info.size);
@@ -22,5 +24,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (url.searchParams.get('download') === '1') headers['Content-Disposition'] = `attachment; filename="scenepilot-${file}"`;
     const stream = createReadStream(path, { start: range.start, end: range.end });
     return new Response(Readable.toWeb(stream) as ReadableStream, { status: request.headers.has('range') ? 206 : 200, headers });
-  } catch { return new Response('Материал не найден или недоступен.', { status: 404, headers: { 'Cache-Control': 'no-store' } }); }
+  } catch (e) { unstable_rethrow(e); if (e instanceof VideoAccessError) return new Response(e.message, { status: 503, headers: { 'Cache-Control': 'no-store' } }); return new Response('Материал не найден или недоступен.', { status: 404, headers: { 'Cache-Control': 'no-store' } }); }
 }

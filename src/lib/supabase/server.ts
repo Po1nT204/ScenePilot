@@ -2,6 +2,7 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { getSupabaseConfig } from "./config";
+import { supabaseTransport } from './network';
 
 export async function createClient() {
   const config = getSupabaseConfig();
@@ -9,6 +10,7 @@ export async function createClient() {
   const cookieStore = await cookies();
 
   return createServerClient(config.url, config.key, {
+    global: { fetch: supabaseTransport() },
     cookies: {
       getAll() {
         return cookieStore.getAll();

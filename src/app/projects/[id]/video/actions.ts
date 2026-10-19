@@ -1,4 +1,5 @@
 'use server';
+import { unstable_rethrow } from 'next/navigation';
 import { videoContext } from '@/lib/production/context';
 import { selectVisual } from '@/lib/production/clips';
 import { createJob, editJob, listJobs, workerOnline, queueOperation, selectImageProvider, saveAppearance } from '@/lib/production/store';
@@ -10,46 +11,47 @@ import { imageAdapter, imageAvailability } from '@/lib/production/image-registry
 import { isImageProvider, validImageSelection, imageCatalog, type ImageSelection } from '@/lib/production/image-catalog';
 
 function message(error: unknown) {
+  unstable_rethrow(error);
   if (error instanceof Error && !('code' in error) && !(error instanceof SyntaxError)) return error.message;
   return 'Не удалось прочитать или сохранить материалы. Проверьте доступ к локальной папке ScenePilot.';
 }
 export async function videoState(projectId: string, versionId: string) {
-  const { scope } = await videoContext(projectId, versionId);
   try {
+    const { scope } = await videoContext(projectId, versionId);
     const config = providerConfig();
     const imageProviders = imageAvailability(config);
     return { jobs: (await listJobs(scope)).slice(0, 20).map(publicJob), setup: { enabled: config.enabled, speech: !!config.elevenKey, images: Object.values(imageProviders).some(Boolean), imageProviders, workerOnline: await workerOnline() } };
   } catch (e) { return { error: message(e) }; }
 }
 export async function checkVideoSpeechConnection(projectId: string, versionId: string, voiceId: string) {
-  await videoContext(projectId, versionId);
   try {
+    await videoContext(projectId, versionId);
     return { connection: await checkSpeechConnection(typeof voiceId === 'string' ? voiceId.trim() : '', providerConfig().elevenKey) };
   } catch (e) { return { error: message(e) }; }
 }
 export async function checkVideoImageConnection(projectId: string, versionId: string, provider: string) {
-  await videoContext(projectId, versionId);
   try {
+    await videoContext(projectId, versionId);
     if (!isImageProvider(provider)) throw new Error('Выберите модуль изображений для проверки.');
     return { connection: await imageAdapter(provider, providerConfig()).checkConnection() };
   } catch (e) { return { error: message(e) }; }
 }
 export async function newVideo(projectId: string, versionId: string, voiceId: string, imageProvider: ImageSelection = 'none') {
-  const { scope, project, version } = await videoContext(projectId, versionId);
   try {
+    const { scope, project, version } = await videoContext(projectId, versionId);
     if (!validImageSelection(imageProvider)) throw new Error('Неизвестный модуль изображений.');
     const job = await createJob(scope, { title: project.title, script: version.content, source: version.source || 'unknown', voiceId: typeof voiceId === 'string' ? voiceId.trim() : '', imageProvider });
     return { job: publicJob(job) };
   } catch (e) { return { error: message(e) }; }
 }
 export async function saveVideoImageProvider(projectId: string, versionId: string, id: string, revision: number, provider: string) {
-  const { scope } = await videoContext(projectId, versionId);
-  try { return { job: publicJob(await editJob(id, scope, revision, job => selectImageProvider(job, provider))) }; }
+  try {
+    const { scope } = await videoContext(projectId, versionId); return { job: publicJob(await editJob(id, scope, revision, job => selectImageProvider(job, provider))) }; }
   catch (e) { return { error: message(e) }; }
 }
 export async function saveVideoPrompts(projectId: string, versionId: string, id: string, revision: number, prompts: { id: string; prompt: string }[]) {
-  const { scope } = await videoContext(projectId, versionId);
   try {
+    const { scope } = await videoContext(projectId, versionId);
     const job = await editJob(id, scope, revision, job => {
       if (!Array.isArray(prompts) || prompts.length !== job.shots.length || new Set(prompts.map(p => p.id)).size !== prompts.length) throw new Error('Некорректный набор кадров.');
       for (const shot of job.shots) {
@@ -64,18 +66,18 @@ export async function saveVideoPrompts(projectId: string, versionId: string, id:
   } catch (e) { return { error: message(e) }; }
 }
 export async function saveVideoAppearance(projectId: string, versionId: string, id: string, revision: number, style: string, subtitles: boolean) {
-  const { scope } = await videoContext(projectId, versionId);
-  try { return { job: publicJob(await editJob(id, scope, revision, job => saveAppearance(job, style, subtitles))) }; }
+  try {
+    const { scope } = await videoContext(projectId, versionId); return { job: publicJob(await editJob(id, scope, revision, job => saveAppearance(job, style, subtitles))) }; }
   catch (e) { return { error: message(e) }; }
 }
 export async function saveVideoVisual(projectId: string, versionId: string, id: string, revision: number, shotId: string, visual: string, tail: string) {
-  const { scope } = await videoContext(projectId, versionId);
-  try { return { job: publicJob(await editJob(id, scope, revision, job => selectVisual(job, shotId, visual, tail))) }; }
+  try {
+    const { scope } = await videoContext(projectId, versionId); return { job: publicJob(await editJob(id, scope, revision, job => selectVisual(job, shotId, visual, tail))) }; }
   catch (e) { return { error: message(e) }; }
 }
 export async function startVideoOperation(projectId: string, versionId: string, id: string, revision: number, kind: VideoOperation['kind'], budgetUSD: number, paidConfirmed: boolean, shotId?: string) {
-  const { scope } = await videoContext(projectId, versionId);
   try {
+    const { scope } = await videoContext(projectId, versionId);
     if (!(await workerOnline())) throw new Error('Запустите обработчик командой npm run video:worker в отдельном терминале.');
     const config = providerConfig();
     const job = await editJob(id, scope, revision, job => {

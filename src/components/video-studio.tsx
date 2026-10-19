@@ -1,7 +1,8 @@
 'use client';
-import { useCallback, useEffect, useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import Image from 'next/image';
 import { RunwayConnection } from './runway-connection';
+import { FlowHandoff } from './flow-handoff';
 import { type VideoView, type VideoSetup, type VideoOperation, type SpeechConnection, hasVisual, usesClip, estimatedCost, requiredProviders, createsMaterials, createsImages, neededImageProviders, productionRates, productionLimits, normalizeNarration } from '@/lib/production/model';
 import { newVideo, saveVideoPrompts, startVideoOperation, videoState, checkVideoSpeechConnection, checkVideoImageConnection, saveVideoImageProvider, saveVideoAppearance, saveVideoVisual } from '@/app/projects/[id]/video/actions';
 import { visualStyles, imagePrompt, type VisualStyle } from '@/lib/production/visual-style';
@@ -38,18 +39,29 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
   const checkedConnection = connection?.voiceId === checkVoice ? connection : undefined;
   const assetURL = (file: string, download = false) => `/projects/${projectId}/video/assets/${job!.id}/${file}?version=${versionId}${download ? '&download=1' : ''}`;
   const putJob = (value: VideoView) => { setJobs(old => [value, ...old.filter(j => j.id !== value.id)]); setSelected(value.id); };
+  const refreshing = useRef(false);
   const refresh = useCallback(async () => {
+    if (refreshing.current) return;
+    refreshing.current = true;
     try {
       const state = await videoState(projectId, versionId);
       if (state.error) { setError(state.error); return; }
       setJobs(state.jobs!); setSetup(state.setup!);
-    } catch { setError('Не удалось обновить состояние. Проверьте соединение.'); }
+    } catch { setError('Не удалось обновить состояние. Проверьте соединение приложения с Supabase.'); }
+    finally { refreshing.current = false; }
   }, [projectId, versionId]);
+  const processing = job?.status === 'queued' || job?.status === 'running';
   useEffect(() => {
+    if (pending || dirty) return;
     let cancelled = false;
-    const timer = setInterval(() => { if (!cancelled && document.visibilityState === 'visible') void refresh(); }, 4000);
-    return () => { cancelled = true; clearInterval(timer); };
-  }, [refresh]);
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      if (document.visibilityState === 'visible') await refresh();
+      if (!cancelled) timer = setTimeout(() => void poll(), processing ? 4000 : 30000);
+    };
+    timer = setTimeout(() => void poll(), processing ? 4000 : 30000);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [refresh, processing, pending, dirty]);
   useEffect(() => {
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
@@ -133,6 +145,9 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
       try {
         const query = new URLSearchParams({ version: versionId, revision: String(job.revision), shot: shotId });
         const response = await fetch(`/projects/${projectId}/video/clips/${job.id}?${query}`, { method: 'POST', headers: { 'Content-Type': 'video/mp4' }, body: file });
+        if (!response.headers.get('content-type')?.includes('application/json')) {
+          setError('Сервер не подтвердил загрузку. Обновите страницу и проверьте вход в ScenePilot; файл не отправлен на генерацию.'); return;
+        }
         const result = await response.json();
         if (result.error) setError(result.error); else if (result.job) putJob(result.job); else setError('Не удалось загрузить клип. Обновите состояние.');
       } catch { setError('Не удалось подтвердить загрузку. Обновите состояние перед повтором.'); }
@@ -172,6 +187,11 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
       </>}
       {checkedImage && <div role="status"><p>{checkedImage.message}{checkedImage.credits !== undefined && <> Баланс: <strong>{checkedImage.credits.toLocaleString('ru-RU')} кредитов</strong>.</>} Проверено: {new Date(checkedImage.checkedAt).toLocaleTimeString('ru-RU')}.</p></div>}
     </details>
+    <details className="video-connection"><summary>Veo через Google Flow · уже имеющаяся Google Pro</summary>
+      <p>Создайте анимацию на сайте Flow, затем добавьте скачанный MP4 к нужной сцене. У готовых изображений ниже есть кнопки скачивания кадра и копирования промпта движения. Монтаж выполняется в ScenePilot с сохранённой озвучкой.</p>
+      <p>Генерация в Flow расходует квоту Google. Открытие сайта и копирование материалов здесь ничего не генерируют. Это ручной перенос клипа: подписка Google Pro не подключает платный Gemini API к ScenePilot.</p>
+      <a className="button secondary" href="https://labs.google/fx/tools/flow" target="_blank" rel="noreferrer">Открыть Google Flow</a>
+    </details>
     <RunwayConnection projectId={projectId} versionId={versionId} disabled={!!busy || dirty} />
     <div className="video-studio-grid">
       <aside className="video-panel video-brief">
@@ -202,6 +222,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
             {job.visualStyle && job.visualStyle !== 'original' && <details><summary>Запрос со стилем</summary><p className="video-muted">{imagePrompt(drafts[shot.id] ?? shot.prompt, job.visualStyle)}</p></details>}
             {!usesClip(shot) && shot.image.file && <small className="video-muted">Источник: {imageCatalog[shot.image.provider || 'bfl-flux11'].label}{shot.image.generatedPrompt !== imagePrompt(shot.prompt, job.visualStyle) ? ' · описание или стиль изменены после генерации' : ''}</small>}
             <button type="button" className="video-text-button" disabled={!!busy || dirty || !canImage || ['pending', 'requesting'].includes(shot.image.state)} onClick={() => operate('replace', shot.id)}>{shot.image.file || shot.image.state === 'unknown' || shot.image.state === 'failed' ? 'Новое изображение' : 'Создать этот кадр'} · ≈ {usd(imagePrice(job))}</button>
+            {shot.image.file && <FlowHandoff imageURL={assetURL(shot.image.file, true)} description={shot.prompt} disabled={!!busy || dirty} />}
             <details><summary>{shot.clip ? 'Клип и монтаж сцены' : 'Добавить MP4-клип'}</summary>
               <p className="video-muted">Готовое видео из Runway, Veo или другого источника. До 32 МиБ, 60 секунд и 4096 × 4096. Файл копируется на компьютер; загрузка не вызывает генерацию.</p>
               <label htmlFor={`clip-${shot.id}`}>{shot.clip ? 'Заменить клип' : 'Выбрать MP4'}</label>
