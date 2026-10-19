@@ -5,8 +5,8 @@ import type { ChannelProfile } from "@/lib/channel";
 import type { Idea, IdeaResult } from "@/lib/ideas";
 import {durationLimits,validDuration} from "@/lib/duration";
 
-export function IdeaAssistant({ profile, profileRevision, language, duration, yandexEnabled, disabled, onBusy, onApply }: {
-  profile: ChannelProfile | null; profileRevision: string | null; language: string; duration: string;
+export function IdeaAssistant({ profile, profileId, profileRevision, language, duration, yandexEnabled, disabled, onBusy, onApply }: {
+  profile: ChannelProfile | null; profileId: string | null; profileRevision: string | null; language: string; duration: string;
   yandexEnabled: boolean; disabled: boolean; onBusy: (busy: boolean) => void; onApply: (idea: Idea, source: "test" | "yandex") => void;
 }) {
   const [seed, setSeed] = useState(profile?.topics ?? "");
@@ -23,7 +23,7 @@ export function IdeaAssistant({ profile, profileRevision, language, duration, ya
     lock.current = true; setBusy(true); onBusy(true);
     setMessage(mode === "yandex" ? "YandexGPT предлагает идеи. Ожидание до 45 секунд…" : "Готовим тестовые варианты…");
     try {
-      const response = await suggestIdeas(seed, language, Number(duration), profileRevision, mode);
+      const response = await suggestIdeas(seed, language, Number(duration), profileId, profileRevision, mode);
       if (response.error !== undefined) setMessage(response.error);
       else {
         setResult({ response, language, duration });

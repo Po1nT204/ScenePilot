@@ -1,5 +1,5 @@
 "use client";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { saveProject } from "@/app/projects/actions";
 import { emptyProject, projectLimits, type ProjectState, type ProjectValues } from "@/lib/projects/validation";
@@ -8,19 +8,21 @@ import type { ChannelProfile } from "@/lib/channel";
 import { sourceLabel } from "@/lib/export";
 import {durationLimits,supportsFullGeneration,longGenerationMessage} from "@/lib/duration";
 const labels = { title: "Название ролика", topic: "Тема и идея", genre: "Жанр", style: "Стиль" };
-export function ProjectForm({ id = null, initial = emptyProject, navigationVersion, profile = null, profileRevision = null, yandexEnabled = false }: { id?: string | null; initial?: ProjectValues; navigationVersion?: string; profile?: ChannelProfile | null; profileRevision?: string | null; yandexEnabled?: boolean }) {
+export function ProjectForm({ id = null, initial = emptyProject, navigationVersion, profile = null, profileId = null, profileRevision = null, yandexEnabled = false, onBusyChange, onEdited }: { id?: string | null; initial?: ProjectValues; navigationVersion?: string; profile?: ChannelProfile | null; profileId?: string | null; profileRevision?: string | null; yandexEnabled?: boolean; onBusyChange?: (busy: boolean) => void; onEdited?: () => void }) {
  const [state, action, pending] = useActionState(saveProject.bind(null, id), { message: "", values: initial } as ProjectState);
  const [values, setValues] = useState(initial);
  const [briefSource, setBriefSource] = useState("manual");
  const [generating, setGenerating] = useState(false);
- const change = (field: keyof ProjectValues, value: string) => setValues(previous => ({ ...previous, [field]: value }));
+ useEffect(() => { onBusyChange?.(pending || generating); }, [pending, generating, onBusyChange]);
+ const change = (field: keyof ProjectValues, value: string) => { setValues(previous => ({ ...previous, [field]: value })); onEdited?.(); };
  return <form action={action} className="auth-form project-form">
   {!id && <>
     <input type="hidden" name="briefSource" value={briefSource} />
+    <input type="hidden" name="profileId" value={profileId ?? ""} />
     <input type="hidden" name="profileRevision" value={profileRevision ?? ""} />
-    <IdeaAssistant profile={profile} profileRevision={profileRevision} language={values.language} duration={values.duration} yandexEnabled={yandexEnabled} disabled={pending} onBusy={setGenerating} onApply={(idea, source) => {
+    <IdeaAssistant profileId={profileId} profile={profile} profileRevision={profileRevision} language={values.language} duration={values.duration} yandexEnabled={yandexEnabled} disabled={pending} onBusy={setGenerating} onApply={(idea, source) => {
       if ((values.title.trim() || values.topic.trim() || values.genre !== initial.genre || values.style !== initial.style) && !window.confirm("Заменить название, тему, жанр и стиль в форме выбранным вариантом? Ваши несохранённые правки этих полей будут заменены.")) return;
-      setValues(previous => ({ ...previous, ...idea })); setBriefSource(source);
+      setValues(previous => ({ ...previous, ...idea })); setBriefSource(source); onEdited?.();
     }} />
     <h2>Настройки ролика</h2>
     <p className="field-hint">Источник замысла: {sourceLabel(briefSource)}. Ручные правки сохраняют эту отметку. Ролик появится после нажатия «Создать ролик».</p>

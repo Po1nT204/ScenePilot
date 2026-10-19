@@ -1,4 +1,4 @@
-import { projectLimits } from './projects/validation';
+import { projectLimits, isProjectId } from './projects/validation';
 
 export const channelLimits = {
   name: 120,
@@ -11,6 +11,7 @@ export const channelLimits = {
 export type ChannelProfile = Record<keyof typeof channelLimits, string> & {
   language: string;
 };
+export type SavedChannelProfile = ChannelProfile & { id: string; updated_at: string };
 export const emptyChannel: ChannelProfile = {
   name: '',
   audience: '',
@@ -21,9 +22,18 @@ export const emptyChannel: ChannelProfile = {
   language: 'en',
 };
 export const channelColumns =
-  'name,audience,topics,tone,format,avoid,language,updated_at';
+  'id,name,audience,topics,tone,format,avoid,language,updated_at';
 export const channelMigrationMessage =
-  'Для профиля канала и новых роликов выполните миграции профиля по docs/setup.md.';
+  'Для нескольких профилей выполните миграцию 202610190001_multiple_channel_profiles.sql по docs/setup.md. Старые проекты сохраняются.';
+export const channelSchemaError = (code?: string) => ['42P01', 'PGRST205', '42703', 'PGRST204'].includes(code ?? '');
+export function channelSelection(id: unknown, revision: unknown): { id: string | null; revision: string | null } {
+  if (id === null || id === '') {
+    if (revision !== null && revision !== '') throw new Error('Выбор профиля устарел. Обновите страницу перед действием.');
+    return { id: null, revision: null };
+  }
+  if (!isProjectId(id) || typeof revision !== 'string' || revision.length > 64 || !/^\d{4}-\d{2}-\d{2}T/.test(revision) || !Number.isFinite(Date.parse(revision))) throw new Error('Выберите сохранённый профиль канала или «Без профиля».');
+  return { id, revision };
+}
 
 // Detailed channel instructions stay in the snapshot, not in short project fields.
 export function channelProjectDefaults(profile: ChannelProfile | null) {

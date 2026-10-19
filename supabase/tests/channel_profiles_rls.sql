@@ -1,3 +1,4 @@
+-- HISTORICAL: before 202610190001 only. After it use multiple_channel_profiles_rls.sql.
 -- Replace with two existing TEST accounts. Run after 202610150002_channel_profile_limits.sql.
 -- Existing test-account profile edits below are rolled back with all other changes.
 begin;

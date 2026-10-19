@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { channelSnapshot, validateChannel, channelLimits, channelProjectDefaults } from "../src/lib/channel";
+import { channelSnapshot, channelSelection, validateChannel, channelLimits, channelProjectDefaults } from "../src/lib/channel";
 import { parseIdeas, testIdeas, validateIdeaRequest } from "../src/lib/ideas";
 import { requestYandexIdeas, requestYandexScript, requestYandexScenes } from "../src/lib/ai/yandex-client";
 import { exportText } from "../src/lib/export";
@@ -109,4 +109,21 @@ test("export includes frozen channel and brief provenance and supports old snaps
   assert.match(exportText(document, "txt"), /Источник замысла: Тестовый шаблон/);
   assert.match(exportText(document, "md"), /Избегать: Dive into/);
   assert.doesNotThrow(() => exportText({ ...document, snapshot: brief }, "txt"));
+});
+
+// Selection metadata is validated separately from the creative snapshot.
+test("profile selection preserves database revision precision and explicit no-profile", () => {
+  const id = "12345678-1234-4234-8234-123456789abc";
+  const revision = "2026-10-19T12:34:56.123456+00:00";
+  assert.deepEqual(channelSelection(id, revision), { id, revision });
+  assert.deepEqual(channelSelection("", ""), { id: null, revision: null });
+  assert.deepEqual(channelSelection(null, null), { id: null, revision: null });
+  assert.deepEqual(channelSnapshot({ ...profile, id, updated_at: revision }), profile);
+});
+
+test("profile selection rejects forged ids and missing or mismatched revision metadata", () => {
+  const id = "12345678-1234-4234-8234-123456789abc";
+  for (const [key, revision] of [[id, ""], [id, "yesterday"], [id, null], ["not-a-uuid", "2026-10-19T00:00:00Z"], [null, "2026-10-19T00:00:00Z"], [id, 123], [{ id }, "2026-10-19T00:00:00Z"]]) {
+    assert.throws(() => channelSelection(key, revision));
+  }
 });

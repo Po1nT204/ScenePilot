@@ -1,26 +1,26 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireProjectUser } from "@/lib/projects/server";
-import { validateChannel, channelMigrationMessage, type ChannelProfile } from "@/lib/channel";
+import { validateChannel, channelMigrationMessage, channelSchemaError, channelSelection, type ChannelProfile } from "@/lib/channel";
 
 export type ChannelState = { message: string; values: ChannelProfile; errors?: Partial<Record<keyof ChannelProfile, string>>; saved?: boolean };
-
 export async function saveChannel(_previous: ChannelState, form: FormData): Promise<ChannelState> {
   const checked = validateChannel(Object.fromEntries(form));
   if (!checked.valid) return { message: "Проверьте выделенные поля.", values: checked.values, errors: checked.errors };
+  let selection;
+  try { selection = channelSelection(form.get('profileId'), form.get('profileRevision')); }
+  catch { return { values: checked.values, message: 'Выбор профиля устарел. Обновите страницу; сначала скопируйте нужный текст.' }; }
   const { supabase, user } = await requireProjectUser();
+  let savedId: string;
   try {
-    const existing = await supabase.from("channel_profiles").select("owner_id").eq("owner_id", user.id).maybeSingle();
-    if (existing.error) return { values: checked.values, message: ["42P01", "PGRST205"].includes(existing.error.code) ? channelMigrationMessage : "Не удалось прочитать профиль. Повторите позже." };
-    const result = existing.data
-      ? await supabase.from("channel_profiles").update(checked.values).eq("owner_id", user.id).select("owner_id").maybeSingle()
-      : await supabase.from("channel_profiles").insert({ ...checked.values, owner_id: user.id }).select("owner_id").single();
-    if (result.error?.code === "23514") return { values: checked.values, message: "База отклонила значения профиля. Если лимиты были увеличены, выполните миграцию 202610150002_channel_profile_limits.sql по docs/setup.md и повторите сохранение. Введённый текст остаётся в форме." };
-    if (result.error || !result.data) return { values: checked.values, message: "Не удалось сохранить профиль. Проверьте соединение; если профиль создан в другой вкладке, обновите страницу." };
-    revalidatePath("/projects/channel");
-    revalidatePath("/projects/new");
-    return { values: checked.values, message: "Профиль сохранён. Он будет использоваться в новых роликах; существующие материалы не изменились.", saved: true };
-  } catch {
-    return { values: checked.values, message: "Не удалось подтвердить сохранение. Поля остаются в форме; проверьте профиль перед повтором." };
-  }
+    const result = selection.id
+      ? await supabase.from("channel_profiles").update(checked.values).eq("id", selection.id).eq("owner_id", user.id).eq('updated_at', selection.revision!).select("id").maybeSingle()
+      : await supabase.from("channel_profiles").insert({ ...checked.values, owner_id: user.id }).select("id").single();
+    if (result.error) return { values: checked.values, message: channelSchemaError(result.error.code) ? channelMigrationMessage : 'Не удалось подтвердить сохранение. Текст остаётся в форме; проверьте список профилей перед повтором.' };
+    if (!result.data) return { values: checked.values, message: 'Профиль изменён в другой вкладке или недоступен. Скопируйте правки и обновите страницу.' };
+    savedId = result.data.id;
+  } catch { return { values: checked.values, message: 'Не удалось подтвердить сохранение. Текст остаётся в форме; проверьте список профилей перед повтором.' }; }
+  revalidatePath('/projects/channel'); revalidatePath('/projects/new');
+  redirect(`/projects/channel?profile=${savedId}&saved=1`);
 }

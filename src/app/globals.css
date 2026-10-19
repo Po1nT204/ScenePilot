@@ -645,3 +645,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid #b35a28; outline-
   .video-materials { border-left: 0; border-top: 1px solid var(--line); padding: 20px 0 0; }
   .library-empty { padding: 24px; }
 }
+
+.channel-profile-list { display: flex; flex-wrap: wrap; gap: 10px; margin: 24px 0; }
+.channel-profile-list a { max-width: 100%; overflow-wrap: anywhere; text-align: left; }
+.channel-profile-list small { display: block; margin-top: 5px; color: var(--muted); font-weight: 400; }
+.channel-profile-list [aria-current="page"] { border-color: var(--green); background: #eef0e8; }
+.channel-profile-picker { margin-block: 24px; padding: 20px; border: 1px solid var(--line); border-radius: 12px; }
+.channel-profile-picker label { display: block; font-weight: 600; margin-bottom: 10px; }
+.channel-profile-picker select { width: 100%; min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 6px; background: #fffefa; font: inherit; }
+.project-form > h2 + .field-hint { margin-top: 8px; }
+.project-form .scene-toolbar + .field-hint { margin-top: 8px; }
