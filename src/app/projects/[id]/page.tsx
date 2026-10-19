@@ -41,7 +41,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
    <p className="project-full-topic">{project.topic}</p>
    <dl className="project-facts"><div><dt>Жанр</dt><dd>{project.genre}</dd></div><div><dt>Стиль</dt><dd>{project.style}</dd></div><div><dt>Язык</dt><dd>{project.language === "ru" ? "Русский" : "Английский"}</dd></div><div><dt>Длительность</dt><dd>{project.target_duration_seconds} сек.</dd></div></dl>
    <Link className="button" href={"/projects/" + id + "?edit=1" + versionSuffix}>Изменить настройки</Link>
-   <DeleteProjectForm id={id} />
+   <DeleteProjectForm id={id} title={project.title} />
   </>}
  </section></>;
 }

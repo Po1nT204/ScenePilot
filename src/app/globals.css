@@ -610,6 +610,18 @@ button:focus-visible, input:focus-visible { outline: 3px solid #b35a28; outline-
 .video-library { padding-bottom: 60px; }
 .video-library .eyebrow { margin-bottom: 10px; }
 .library-note { margin: 0 0 20px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.library-search { display: flex; align-items: end; flex-wrap: wrap; gap: 14px; margin: 20px 0 28px; }
+.library-search > div { flex: 1 1 240px; max-width: 520px; min-width: 0; }
+.library-search label { display: block; margin-bottom: 8px; font-size: 14px; }
+.library-search input { width: 100%; min-width: 0; min-height: 50px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: #fffefa; font: inherit; }
+.library-search input:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.library-search > .text-link { padding-block: 12px; }
+.library-pagination { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 20px; margin-top: 28px; }
+.library-pagination > span { font-size: 14px; }
+.pagination-disabled { color: var(--muted); padding: 12px; }
+.library-delete-link { display: inline-block; margin-left: 20px; padding-block: 8px; font-size: 13px; color: var(--muted); }
+#delete-project { scroll-margin-top: 24px; overflow-wrap: anywhere; }
+#delete-project:target { outline: 2px solid var(--line); outline-offset: 8px; }
 .video-list { display: grid; gap: 16px; }
 .video-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, .8fr); gap: 32px; padding: 28px; border: 1px solid var(--line); border-radius: 12px; background: #fffefa; }
 .video-summary, .video-materials { min-width: 0; }
