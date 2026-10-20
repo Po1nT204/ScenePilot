@@ -1,3 +1,4 @@
+import { RetryPage } from "@/components/retry-page";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from 'next/navigation';
@@ -41,7 +42,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
     {error ? <section className="library-empty"><h2>Не удалось загрузить библиотеку</h2>
       <p role="alert">{["PGRST205", "42P01", "PGRST200"].includes(error.code)
         ? "Для библиотеки нужны таблицы проектов, версий и сцен. Проверьте миграции по инструкции в README."
-        : projectError(error.code)}</p><Link className="text-link" href={libraryURL(page, search)}>Повторить загрузку</Link></section>
+        : projectError(error.code)}</p><RetryPage /></section>
       : !projects.length && search ? <section className="library-empty"><h2>Ничего не найдено</h2><p>Нет роликов с «{search}» в названии. Измените запрос или вернитесь ко всем проектам.</p><Link className="text-link" href="/projects">Показать все ролики</Link></section>
       : !projects.length ? <section className="library-empty"><span className="library-empty-mark" aria-hidden="true">01</span>
         <h2>Добавьте первый ролик</h2><p>Задайте тему и параметры. Затем напишите сценарий или создайте его с помощью YandexGPT.</p>

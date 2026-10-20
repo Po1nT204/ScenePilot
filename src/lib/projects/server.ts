@@ -4,8 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 export const projectColumns = "id,title,topic,genre,language,style,target_duration_seconds,created_at,updated_at,channel_snapshot,brief_source";
 export async function requireProjectUser() {
  const supabase = await createClient();
- const { data, error } = await supabase.auth.getUser();
- if (error && (error.name === "AuthRetryableFetchError" || (error.status && error.status >= 500))) throw new Error("Auth service unavailable");
+ const { data, error } = await supabase.auth.getUser().catch(() => {
+  // A failed access check must not look like a signed-out session.
+  throw new Error("Auth service unavailable");
+ });
+ if (error && (error.name === "AuthRetryableFetchError" || (error.status && (error.status >= 500 || [408, 429].includes(error.status))))) throw new Error("Auth service unavailable");
  if (!data.user) redirect("/login");
  return { supabase, user: data.user };
 }

@@ -1,3 +1,4 @@
+import { RetryPage } from "@/components/retry-page";
 import Link from "next/link";
 import { notFound } from 'next/navigation';
 import { ChannelForm } from "@/components/channel-form";
@@ -19,7 +20,7 @@ export default async function ChannelPage({ searchParams }: { searchParams: Prom
     <Link className="text-link" href="/projects">← Мои ролики</Link>
     <h1 className="auth-title project-label">Профили каналов</h1>
     <p className="auth-description">Сохраните отдельные требования для каждой тематики. Профиль выбирается при создании ролика; старые ролики и версии сохраняют свои настройки.</p>
-    {result.error ? <p role="alert">{channelSchemaError(result.error.code) ? channelMigrationMessage : "Не удалось загрузить профили. Обновите страницу позже."}</p> : <>
+    {result.error ? <div><p role="alert">{channelSchemaError(result.error.code) ? channelMigrationMessage : "Не удалось получить профили из Supabase. Проверьте соединение и повторите загрузку."}</p><RetryPage /></div> : <>
       <nav className="channel-profile-list" aria-label="Профили каналов">
         {profiles.map(profile => <Link className="text-button" key={profile.id} href={`/projects/channel?profile=${profile.id}`} aria-current={selected?.id === profile.id ? 'page' : undefined}>{profile.name}<small>{profile.language === 'ru' ? 'Русский' : 'Английский'}</small></Link>)}
         <Link className="button secondary" href="/projects/channel?profile=new" aria-current={!selected ? 'page' : undefined}>+ Новый профиль</Link>
