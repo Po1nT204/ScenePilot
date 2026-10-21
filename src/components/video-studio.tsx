@@ -4,10 +4,11 @@ import Image from 'next/image';
 import { RunwayConnection } from './runway-connection';
 import { FlowHandoff } from './flow-handoff';
 import { type VideoView, type VideoSetup, type VideoOperation, type SpeechConnection, hasVisual, usesClip, estimatedCost, requiredProviders, createsMaterials, createsImages, neededImageProviders, productionRates, productionLimits, normalizeNarration } from '@/lib/production/model';
-import { newVideo, saveVideoPrompts, startVideoOperation, videoState, checkVideoSpeechConnection, checkVideoImageConnection, saveVideoImageProvider, saveVideoAppearance, saveVideoVisual } from '@/app/projects/[id]/video/actions';
+import { newVideo, saveVideoPrompts, startVideoOperation, videoState, checkVideoSpeechConnection, checkVideoImageConnection, saveVideoImageProvider, saveVideoAppearance, saveVideoVisual, fitVideoClips } from '@/app/projects/[id]/video/actions';
 import { visualStyles, imagePrompt, type VisualStyle } from '@/lib/production/visual-style';
 
 import { imageCatalog, selectedImageProvider, imagePrice, type ImageProviderId, type ImageSelection } from '@/lib/production/image-catalog';
+import { clipFit, videoFps } from '@/lib/production/clip-timing';
 import type { ImageAccess } from '@/lib/production/image-adapter';
 
 const statusLabel: Record<VideoView['status'], string> = { draft: 'План кадров', queued: 'В очереди', running: 'В работе', materials: 'Материалы готовы', ready: 'Видео готово', failed: 'Нужно внимание' };
@@ -155,6 +156,29 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
       } catch { setError('Не удалось подтвердить загрузку. Обновите состояние перед повтором.'); }
     });
   }
+  function fitClips() {
+    if (!job || busy || dirty) return;
+    startTransition(async () => {
+      setError('');
+      try {
+        const result = await fitVideoClips(projectId, versionId, job.id, job.revision);
+        if (result.error) setError(result.error); else putJob(result.job!);
+      } catch { setError('Не удалось подтвердить настройку клипов. Обновите состояние перед повтором.'); }
+    });
+  }
+  function timingLabel(shot: VideoView['shots'][number]) {
+    const timing = job?.shotTimings?.[shot.id];
+    if (!timing) return 'Длительность появится после озвучки';
+    const seconds = timing.end - timing.start;
+    const label = `Озвучка ≈ ${seconds.toFixed(1)} с`;
+    if (!usesClip(shot)) return label;
+    const clip = shot.clip!;
+    if (clip.duration >= seconds) return `${label} · клип ${clip.duration.toFixed(1)} с, обрезка по сцене`;
+    if (clip.tail === 'hold') return `${label} · клип ${clip.duration.toFixed(1)} с → стоп-кадр ≈ ${(seconds - clip.duration).toFixed(1)} с`;
+    if (clip.tail === 'loop') return `${label} · клип ${clip.duration.toFixed(1)} с → обычный повтор`;
+    const fit = clipFit(Math.max(1, Math.round(clip.duration * videoFps)), Math.max(1, Math.round(seconds * videoFps)));
+    return `${label} · клип ${clip.duration.toFixed(1)} с → ${fit.kind === 'slow' ? 'плавное замедление' : fit.kind === 'smooth' ? 'повтор со сглаженным стыком' : 'повтор'}`;
+  }
   function changeVisual(shotId: string, visual: string, tail: string) {
     if (!job || busy || dirty) return;
     startTransition(async () => {
@@ -194,7 +218,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
       </>}
       {checkedImage && <div role="status"><p>{checkedImage.message}{checkedImage.credits !== undefined && <> Баланс: <strong>{checkedImage.credits.toLocaleString('ru-RU')} кредитов</strong>.</>} Проверено: {new Date(checkedImage.checkedAt).toLocaleTimeString('ru-RU')}.</p></div>}
     </details>
-    <details className="video-connection"><summary>Veo через Google Flow · уже имеющаяся Google Pro</summary>
+    <details className="video-connection"><summary>Google Flow · уже имеющаяся Google Pro</summary>
       <p>Создайте анимацию на сайте Flow, затем добавьте скачанный MP4 к нужной сцене. У готовых изображений ниже есть кнопки скачивания кадра и копирования промпта движения. Монтаж выполняется в ScenePilot с сохранённой озвучкой.</p>
       <p>Генерация в Flow расходует квоту Google. Открытие сайта и копирование материалов здесь ничего не генерируют. Это ручной перенос клипа: подписка Google Pro не подключает платный Gemini API к ScenePilot.</p>
       <a className="button secondary" href="https://labs.google/fx/tools/flow" target="_blank" rel="noreferrer">Открыть Google Flow</a>
@@ -235,9 +259,13 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
           </select>
           <p className="video-muted">Стиль сохраняется сразу и применяется к новым запросам. Готовые картинки остаются прежними. Для сравнения замените один кадр. Стиль не гарантирует реализм или одинаковые лица.</p>
         </div>}
+        {job && <div className="video-timing-note">
+          <p className="video-muted">{job.shotTimings ? 'Время кадров рассчитано по сохранённой озвучке. Последний кадр при сборке включает также хвост аудиофайла.' : 'Сначала создайте озвучку на шаге 03, чтобы узнать длительность каждого кадра до генерации в Flow.'}</p>
+          {job.shots.some(shot => shot.clip) && <><button type="button" className="video-text-button" disabled={!!busy || dirty} onClick={fitClips}>Автоподгонка всех клипов под озвучку</button><p className="video-muted">Небольшое замедление или повтор со сглаженным стыком. Бесплатно, при следующей сборке MP4. Новые действия в сцене не создаются; повтор и наложение могут быть заметны.</p></>}
+        </div>}
         {!job ? <div className="video-empty"><span className="video-empty-number">01 — 06</span><h4>Здесь появятся кадры</h4><p>Подготовьте план из сценария. Затем создайте изображения и озвучку.</p></div> : <ol className="video-shot-list">{job.shots.map((shot, index) => <li className="video-shot" key={shot.id}>
           <div className="video-shot-image">{usesClip(shot) ? <video style={{ width: '100%', height: '100%', objectFit: 'contain' }} controls muted preload="metadata" src={assetURL(shot.clip!.file)} aria-label={`Клип сцены ${index + 1}`} /> : shot.image.file ? <Image unoptimized width={1280} height={720} src={assetURL(shot.image.file)} alt={`Изображение кадра ${index + 1}`} /> : <span>КАДР {String(index + 1).padStart(2, '0')}<small>{shot.image.state === 'pending' ? 'Обрабатывается сервисом' : shot.image.state === 'unknown' ? 'Результат запроса неизвестен' : 'Изображение ещё не создано'}</small></span>}</div>
-          <div className="video-shot-copy"><p className="video-shot-label">Кадр {index + 1} · {usesClip(shot) ? 'MP4-клип' : 'Изображение'}</p><p>{shot.text}</p><details><summary>Описание изображения</summary><label className="sr-only" htmlFor={`prompt-${shot.id}`}>Описание кадра {index + 1}</label><textarea id={`prompt-${shot.id}`} rows={4} maxLength={productionLimits.prompt} value={drafts[shot.id] ?? shot.prompt} disabled={!!busy} onChange={e => { if (!dirty) setDraftRevision(job.revision); setDrafts(old => ({ ...old, [shot.id]: e.target.value })); }} /></details>
+          <div className="video-shot-copy"><p className="video-shot-label">Кадр {index + 1} · {usesClip(shot) ? 'MP4-клип' : 'Изображение'}</p><p>{shot.text}</p><p className="video-muted">{timingLabel(shot)}</p><details><summary>Описание изображения</summary><label className="sr-only" htmlFor={`prompt-${shot.id}`}>Описание кадра {index + 1}</label><textarea id={`prompt-${shot.id}`} rows={4} maxLength={productionLimits.prompt} value={drafts[shot.id] ?? shot.prompt} disabled={!!busy} onChange={e => { if (!dirty) setDraftRevision(job.revision); setDrafts(old => ({ ...old, [shot.id]: e.target.value })); }} /></details>
             {job.visualStyle && job.visualStyle !== 'original' && <details><summary>Запрос со стилем</summary><p className="video-muted">{imagePrompt(drafts[shot.id] ?? shot.prompt, job.visualStyle)}</p></details>}
             {!usesClip(shot) && shot.image.file && <small className="video-muted">Источник: {imageCatalog[shot.image.provider || 'bfl-flux11'].label}{shot.image.generatedPrompt !== imagePrompt(shot.prompt, job.visualStyle) ? ' · описание или стиль изменены после генерации' : ''}</small>}
             <button type="button" className="video-text-button" disabled={!!busy || dirty || !canImage || ['pending', 'requesting'].includes(shot.image.state)} onClick={() => operate('replace', shot.id)}>{shot.image.file || shot.image.state === 'unknown' || shot.image.state === 'failed' ? 'Новое изображение' : 'Создать этот кадр'} · ≈ {usd(imagePrice(job))}</button>
@@ -251,7 +279,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
                 <label htmlFor={`visual-${shot.id}`}>Материал в сборке</label>
                 <select id={`visual-${shot.id}`} value={shot.visual ?? 'image'} disabled={!!busy || dirty} onChange={e => changeVisual(shot.id, e.target.value, shot.clip!.tail)}><option value="image">Изображение</option><option value="clip">MP4-клип</option></select>
                 <label htmlFor={`tail-${shot.id}`}>Если клип короче сцены</label>
-                <select id={`tail-${shot.id}`} value={shot.clip.tail} disabled={!!busy || dirty} onChange={e => changeVisual(shot.id, shot.visual ?? 'image', e.target.value)}><option value="hold">Задержать последний кадр</option><option value="loop">Повторять клип</option></select>
+                <select id={`tail-${shot.id}`} value={shot.clip.tail} disabled={!!busy || dirty} onChange={e => changeVisual(shot.id, shot.visual ?? 'image', e.target.value)}><option value="auto">Авто: замедление / плавный повтор</option><option value="hold">Задержать последний кадр</option><option value="loop">Повторять клип</option></select>
                 <a className="video-text-button" href={assetURL(shot.clip.file, true)}>Скачать исходный клип</a>
               </>}
             </details>

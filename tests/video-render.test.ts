@@ -9,7 +9,7 @@ import { createJob, jobDirectory, saveJob, readJob } from '../src/lib/production
 import { renderVideo, runProgram } from '../src/lib/production/render';
 import { importClip, selectVisual } from '../src/lib/production/clips';
 
-test('real FFmpeg renders mixed JPEG/PNG, probes and decodes an MP4 with subtitles and audio', { timeout: 120000 }, async () => {
+test('real FFmpeg renders mixed JPEG/PNG and fitted clips with preserved speech and subtitles', { timeout: 240000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'scenepilot-render-'));
   try {
     const job = await createJob({ ownerId: randomUUID(), projectId: randomUUID(), versionId: randomUUID() }, { title: 'Fixture', script: 'Тест. Кадр.', source: 'test', voiceId: 'fixture' }, root);
@@ -44,18 +44,37 @@ test('real FFmpeg renders mixed JPEG/PNG, probes and decodes an MP4 with subtitl
     assert.equal(mixed.shots[0].image.file, job.shots[0].image.file);
     assert.equal(mixed.audio.file, job.audio.file);
     assert.equal((await readJob(job.id, root)).shots[0].clip?.source, 'upload');
+    assert.equal(mixed.shots[0].clip?.tail, 'auto');
+    const automatic = await renderVideo(mixed, root, async () => {});
+    selectVisual(mixed, mixed.shots[0].id, 'clip', 'hold');
     const held = await renderVideo(mixed, root, async () => {});
     selectVisual(mixed, mixed.shots[0].id, 'clip', 'loop');
     const looped = await renderVideo(mixed, root, async () => {});
-    for (const [name, file] of [['held', held.output], ['looped', looped.output]]) {
+    for (const [name, file] of [['held', held.output], ['looped', looped.output], ['automatic', automatic.output]]) {
       await runProgram(ffmpeg, ['-v', 'error', '-i', file, '-f', 'null', '-'], cwd, 30000);
       await runProgram(ffmpeg, ['-v', 'error', '-ss', '0.45', '-i', file, '-frames:v', '1', '-f', 'md5', `${name}.md5`], cwd, 30000);
       await runProgram(ffmpeg, ['-v', 'error', '-i', file, '-map', '0:a:0', '-f', 'md5', `${name}-audio.md5`], cwd, 30000);
     }
     assert.notEqual(await readFile(join(cwd, 'held.md5'), 'utf8'), await readFile(join(cwd, 'looped.md5'), 'utf8'));
     assert.equal(await readFile(join(cwd, 'held-audio.md5'), 'utf8'), await readFile(join(cwd, 'looped-audio.md5'), 'utf8'));
+    assert.equal(await readFile(join(cwd, 'held-audio.md5'), 'utf8'), await readFile(join(cwd, 'automatic-audio.md5'), 'utf8'));
+    // Compare motion after the source clip has ended: auto must not freeze its final frame.
+    await runProgram(ffmpeg, ['-v', 'error', '-ss', '0.35', '-i', automatic.output, '-frames:v', '1', '-f', 'md5', 'automatic-earlier.md5'], cwd, 30000);
+    assert.notEqual(await readFile(join(cwd, 'automatic-earlier.md5'), 'utf8'), await readFile(join(cwd, 'automatic.md5'), 'utf8'));
     await runProgram(ffmpeg, ['-v', 'error', '-i', clean.output, '-map', '0:a:0', '-f', 'md5', 'clean-audio.md5'], cwd, 30000);
     assert.equal(await readFile(join(cwd, 'clean-audio.md5'), 'utf8'), await readFile(join(cwd, 'held-audio.md5'), 'utf8'));
+    // A 0.5s source fits the 0.6s first scene by slowing down, not by looping or freezing.
+    await runProgram(ffmpeg, ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=320x180:rate=24:duration=0.5',
+      '-c:v', 'libx264', '-pix_fmt', 'yuv420p', 'slow-source.mp4'], cwd, 30000);
+    mixed.shots[0].clip = { file: 'slow-source.mp4', duration: 0.5, source: 'upload', tail: 'auto' };
+    const slowed = await renderVideo(mixed, root, async () => {});
+    for (const time of ['0.5', '0.54']) {
+      await runProgram(ffmpeg, ['-v', 'error', '-ss', time, '-i', slowed.output, '-frames:v', '1', '-f', 'md5', `slow-${time}.md5`], cwd, 30000);
+    }
+    assert.notEqual(await readFile(join(cwd, 'slow-0.5.md5'), 'utf8'), await readFile(join(cwd, 'slow-0.54.md5'), 'utf8'));
+    await runProgram(ffmpeg, ['-v', 'error', '-i', slowed.output, '-map', '0:a:0', '-f', 'md5', 'slowed-audio.md5'], cwd, 30000);
+    assert.equal(await readFile(join(cwd, 'clean-audio.md5'), 'utf8'), await readFile(join(cwd, 'slowed-audio.md5'), 'utf8'));
     assert.ok(!(await readdir(cwd)).some(name => name.endsWith('.txt')));
+    assert.ok(!(await readdir(cwd)).some(name => /-(normalized|cycle)\.mp4$/.test(name)));
   } finally { await rm(root, { recursive: true, force: true }); }
 });

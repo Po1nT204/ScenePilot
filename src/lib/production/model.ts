@@ -9,7 +9,8 @@ export type Asset = {
   file?: string; requestId?: string; pollingUrl?: string; generatedPrompt?: string; requestedPrompt?: string;
   provider?: ImageProviderId; requestedProvider?: ImageProviderId;
 };
-export type VideoShot = { id: string; text: string; start: number; end: number; prompt: string; image: Asset; visual?: 'image' | 'clip'; clip?: { file: string; duration: number; source: 'upload'; tail: 'hold' | 'loop' } };
+export type ClipTail = 'hold' | 'loop' | 'auto';
+export type VideoShot = { id: string; text: string; start: number; end: number; prompt: string; image: Asset; visual?: 'image' | 'clip'; clip?: { file: string; duration: number; source: 'upload'; tail: ClipTail } };
 export const usesClip = (shot: VideoShot) => shot.visual === 'clip' && !!shot.clip?.file;
 export const hasVisual = (shot: VideoShot) => shot.visual === 'clip' ? !!shot.clip?.file : !!shot.image.file;
 export type VideoOperation = { kind: 'generate' | 'speech' | 'replace' | 'render' | 'check'; shotId?: string; budgetUSD: number; reservedUSD: number };
@@ -30,7 +31,8 @@ export type VideoScope = { ownerId: string; projectId: string; versionId: string
 export type VideoSetup = { enabled: boolean; speech: boolean; images: boolean; imageProviders?: Record<ImageProviderId, boolean>; workerOnline: boolean };
 export type SpeechConnection = { voiceId: string; voiceName: string; tier: string; remainingCharacters: number; checkedAt: string };
 export type ImageConnection = { credits: number; checkedAt: string };
-export type VideoView = Omit<VideoJob, 'alignment' | 'ownerId'>;
+export type ShotTiming = { start: number; end: number };
+export type VideoView = Omit<VideoJob, 'alignment' | 'ownerId'> & { shotTimings?: Record<string, ShotTiming> };
 export const normalizeNarration = (text: string) => text.trim().replace(/\s+/gu, ' ');
 export const validVoice = (id: string) => /^[a-zA-Z0-9_-]{5,100}$/.test(id);
 export function validateNarration(script: string) {
@@ -111,8 +113,19 @@ export function publicJob(job: VideoJob): VideoView {
   // Provider polling URLs can contain signed parameters. Keep them on the server.
   const { alignment: _alignment, ownerId: _owner, ...view } = job;
   void _alignment; void _owner;
-  return { ...view, audio: { state: job.audio.state, file: job.audio.file },
+  return { ...view, shotTimings: job.alignment ? shotTimings(job, job.alignment.character_end_times_seconds.at(-1)!) : undefined, audio: { state: job.audio.state, file: job.audio.file },
     shots: job.shots.map(s => ({ ...s, image: { state: s.image.state, file: s.image.file, generatedPrompt: s.image.generatedPrompt, provider: s.image.provider, requestedProvider: s.image.requestedProvider } })) };
+}
+// Character boundaries come from the saved TTS alignment, not a words/minute guess.
+// The public view ends at the last spoken character; render includes the audio file's trailing silence.
+export function shotTimings(job: Pick<VideoJob, 'shots' | 'alignment'>, duration: number): Record<string, ShotTiming> {
+  if (!job.alignment) throw new Error('Сначала создайте озвучку с таймингами.');
+  return Object.fromEntries(job.shots.map((shot, i) => {
+    const start = i === 0 ? 0 : job.alignment!.character_start_times_seconds[shot.start];
+    const end = i + 1 < job.shots.length ? job.alignment!.character_start_times_seconds[job.shots[i + 1].start] : duration;
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end <= start) throw new Error('Некорректная длительность кадра.');
+    return [shot.id, { start, end }];
+  }));
 }
 export function parseAlignment(value: unknown, text: string): Alignment {
   const a = value as Alignment | null;

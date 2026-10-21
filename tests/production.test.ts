@@ -17,10 +17,47 @@ import { imageCatalog, selectedImageProvider } from '../src/lib/production/image
 import { neededImageProviders } from '../src/lib/production/model';
 import { imagePrompt } from '../src/lib/production/visual-style';
 import { saveAppearance } from '../src/lib/production/store';
-import { selectVisual, importClip } from '../src/lib/production/clips';
+import { selectVisual, importClip, fitAllClips } from '../src/lib/production/clips';
 import { assetsReady } from '../src/lib/production/model';
+import { clipFit } from '../src/lib/production/clip-timing';
 
 const scope = { ownerId: randomUUID(), projectId: randomUUID(), versionId: randomUUID() };
+
+test('automatic clip timing trims, limits slowdown and blends only repeatable multi-frame clips', () => {
+  assert.equal(clipFit(240, 200).kind, 'trim');
+  assert.deepEqual(clipFit(240, 300), { kind: 'slow', stretch: 1.25, fadeFrames: 0 });
+  assert.deepEqual(clipFit(240, 301), { kind: 'smooth', stretch: 1, fadeFrames: 12 });
+  assert.equal(clipFit(2, 240).kind, 'loop');
+  assert.equal(clipFit(4, 240).fadeFrames, 1);
+  for (const frames of [0, -1, NaN, Infinity, 1.5]) assert.throws(() => clipFit(frames, 24));
+});
+
+test('bulk clip fitting preserves selected visuals, files and speech; view exposes spoken timing without alignment', async () => sandbox(async root => {
+  const job = await createJob(scope, input, root);
+  assert.equal(publicJob(job).shotTimings, undefined);
+  assert.throws(() => fitAllClips(job), /добавьте/);
+  job.alignment = alignment(job.text);
+  job.audio = { state: 'ready', file: 'voice.mp3' };
+  job.output = 'old.mp4';
+  for (const [i, shot] of job.shots.entries()) {
+    shot.visual = i ? 'image' : 'clip';
+    shot.clip = { file: `${i}.mp4`, duration: 1, source: 'upload', tail: 'hold' };
+  }
+  const originals = job.shots.map(s => ({ file: s.clip!.file, visual: s.visual }));
+  fitAllClips(job);
+  assert.ok(job.shots.every(s => s.clip!.tail === 'auto'));
+  assert.deepEqual(job.shots.map(s => ({ file: s.clip!.file, visual: s.visual })), originals);
+  assert.equal(job.audio.file, 'voice.mp3');
+  assert.equal(job.outputStale, true);
+  const view = publicJob(job);
+  assert.equal('alignment' in view, false);
+  assert.equal('ownerId' in view, false);
+  assert.equal(view.shotTimings![job.shots[0].id].start, 0);
+  assert.equal(view.shotTimings![job.shots[0].id].end, job.alignment.character_start_times_seconds[job.shots[1].start]);
+  assert.equal(view.shotTimings![job.shots.at(-1)!.id].end, job.alignment.character_end_times_seconds.at(-1));
+  await assert.rejects(editJob(job.id, { ...scope, ownerId: randomUUID() }, job.revision, fitAllClips, root), /недоступно/);
+  await assert.rejects(editJob(job.id, scope, 0, fitAllClips, root), /изменилось/);
+}));
 
 test('active clips replace missing pictures in budget/readiness and generation, keep images and obey revision/owner', async () => sandbox(async root => {
   const job = await createJob(scope, input, root);

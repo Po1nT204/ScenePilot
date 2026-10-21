@@ -24,12 +24,12 @@ export function FlowHandoff({ imageURL, description, disabled, sceneNumber, hasC
         <select id={`${id}-camera`} value={camera} disabled={disabled} onChange={event => { setCamera(event.target.value as FlowCameraMove); setMessage(''); }}>
           {Object.entries(flowCameraMoves).map(([value, move]) => <option key={value} value={value}>{move.label}</option>)}
         </select>
-        <p>Выбор камеры относится к промпту Flow, действует до обновления страницы. Движение персонажей уточните в Flow.</p>
+        <p>Выбор камеры относится к промпту Flow, действует до обновления страницы. Для повторов лучше неподвижная камера и цикличное движение: волны, дождь, колышущаяся листва.</p>
         <details><summary>Посмотреть промпт</summary><textarea aria-label={`Промпт Flow для кадра ${sceneNumber}`} rows={5} readOnly value={prompt} /></details>
     <button type="button" className="video-text-button" disabled={disabled} onClick={() => void copy()}>Скопировать промпт анимации</button>
     {message && <p role="status" className="video-muted">{message}</p>}
         <p><a className="button secondary" href="https://labs.google/fx/tools/flow" target="_blank" rel="noreferrer">Открыть Flow ↗</a></p>
-        <p>На сайте выберите Veo, один результат и проверьте расход кредитов. Здесь генерация не запускается.</p>
+        <p>На сайте выберите модель, один результат и проверьте расход кредитов. Здесь генерация не запускается.</p>
       </li>
       <li><strong>Верните клип в кадр {sceneNumber}</strong>
         <label htmlFor={`${id}-clip`}>{hasClip ? 'Заменить MP4 этой сцены' : 'Загрузить скачанный MP4'}</label>
@@ -38,7 +38,7 @@ export function FlowHandoff({ imageURL, description, disabled, sceneNumber, hasC
           if (file) onImport(file);
           event.target.value = '';
         }} />
-        <p>До 32 МиБ и 60 секунд. Озвучка ролика сохранится; звук клипа в монтаж не попадёт.</p>
+        <p>До 32 МиБ и 60 секунд. Новые клипы автоматически подгоняются под озвучку при сборке. Звук клипа в монтаж не попадёт.</p>
       </li>
     </ol>
   </details>;
