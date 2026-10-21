@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import Image from 'next/image';
 import { RunwayConnection } from './runway-connection';
+import { TimedStoryboard } from './timed-storyboard';
 import { FlowHandoff } from './flow-handoff';
 import { type VideoView, type VideoSetup, type VideoOperation, type SpeechConnection, hasVisual, usesClip, estimatedCost, requiredProviders, createsMaterials, createsImages, neededImageProviders, productionRates, productionLimits, normalizeNarration } from '@/lib/production/model';
 import { newVideo, saveVideoPrompts, startVideoOperation, videoState, checkVideoSpeechConnection, checkVideoImageConnection, saveVideoImageProvider, saveVideoAppearance, saveVideoVisual, fitVideoClips } from '@/app/projects/[id]/video/actions';
@@ -19,6 +20,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
   const [jobs, setJobs] = useState(initialJobs), [selected, setSelected] = useState(initialJobs[0]?.id || '');
   const [setup, setSetup] = useState(initialSetup), [voice, setVoice] = useState(defaultVoice);
   const [stage, setStage] = useState<'plan' | 'frames' | 'result'>(initialJobs[0]?.output ? 'result' : initialJobs.length ? 'frames' : 'plan');
+  const [storyboardBusy, setStoryboardBusy] = useState(false);
   const [showConnections, setShowConnections] = useState(false);
   const [error, setError] = useState(''), [pending, startTransition] = useTransition();
   const [drafts, setDrafts] = useState<Record<string, string>>({}), [draftRevision, setDraftRevision] = useState<number>();
@@ -32,7 +34,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
   const imageConfigured = (id: ImageProviderId) => setup.imageProviders?.[id] ?? (id === 'bfl-flux11' && setup.images);
   const checkedImage = imageConnection?.provider === provider ? imageConnection : undefined;
   const dirty = Object.keys(drafts).length > 0;
-  const busy = pending || job?.status === 'queued' || job?.status === 'running';
+  const busy = storyboardBusy || pending || job?.status === 'queued' || job?.status === 'running';
   const cost = job ? estimatedCost(job, 'generate') : 0;
   const needs = job ? requiredProviders(job, 'generate') : { speech: true, images: true };
   const canGenerate = setup.enabled && (!needs.speech || setup.speech) && (!needs.images || (job && (!createsImages(job, 'generate') || provider !== 'none') && neededImageProviders(job, 'generate').every(imageConfigured))) && setup.workerOnline;
@@ -212,8 +214,8 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
       </select>
       <p className="video-muted">Выбор меняет только будущие запросы. Озвучка и готовые кадры сохраняются. Незавершённые задачи проверяются у исходного сервиса. Для Runway ниже есть отдельное подключение аккаунта подписки. Автоматическая видеоанимация пока не включена.</p>
       {providerInfo && <><p>{providerInfo.terms} <a href={providerInfo.url} target="_blank" rel="noreferrer">Условия сервиса</a></p>
-        <p className="video-muted">В .env.local: {providerInfo.setup}. После изменения ключей перезапустите приложение и обработчик. {provider === 'cloudflare-sdxl' ? 'Cloudflare → Workers AI → Use REST API: создайте токен Workers AI Read/Edit и скопируйте Account ID. Пополнять BFL не требуется.' : 'Нужен собственный API-ключ и баланс BFL.'}</p>
-        <button type="button" className="button secondary" disabled={!!busy || provider === 'none' || !imageConfigured(provider)} onClick={checkImages}>Проверить {provider === 'cloudflare-sdxl' ? 'Cloudflare' : 'BFL'} · без генерации</button>
+        <p className="video-muted">В .env.local: {providerInfo.setup}. После изменения ключей перезапустите приложение и обработчик. {provider === 'cloudflare-sdxl' ? 'Cloudflare → Workers AI → Use REST API: создайте токен Workers AI Read/Edit и скопируйте Account ID. Пополнять BFL не требуется.' : provider === 'google-nano-banana-21' ? 'Нужен ключ Google AI Studio и отдельный платёжный аккаунт Gemini API.' : 'Нужен собственный API-ключ и баланс BFL.'}</p>
+        <button type="button" className="button secondary" disabled={!!busy || provider === 'none' || !imageConfigured(provider)} onClick={checkImages}>Проверить {providerInfo.label} · без генерации</button>
         {provider !== 'none' && !imageConfigured(provider) && <p className="video-muted">Настройки выбранного модуля ещё не заданы или Account ID некорректен.</p>}
       </>}
       {checkedImage && <div role="status"><p>{checkedImage.message}{checkedImage.credits !== undefined && <> Баланс: <strong>{checkedImage.credits.toLocaleString('ru-RU')} кредитов</strong>.</>} Проверено: {new Date(checkedImage.checkedAt).toLocaleTimeString('ru-RU')}.</p></div>}
@@ -236,6 +238,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
           <label htmlFor="video-budget">Предел оценки следующего запуска, USD</label><input id="video-budget" type="number" min="0" max="10" step="0.01" value={budget} onChange={e => { setBudget(e.target.value); setConfirmed(false); }} disabled={!!busy} />
           <label className="video-consent"><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} disabled={!!busy} />Разрешаю указанные запросы к выбранному сервису, включая бесплатную квоту. Для платного API действует предел оценки; списание при ошибке возможно.</label>
     </details>}
+    {job && stage === 'frames' && <TimedStoryboard key={`${job.id}-${job.revision}`} job={job} projectId={projectId} versionId={versionId} disabled={!!busy || dirty} onBusy={setStoryboardBusy} onCreated={value => { putJob(value); setConfirmed(false); }} />}
     <div className="video-studio-grid">
       <section id="video-stage-plan" aria-label="Сценарий" hidden={stage !== 'plan'} className="video-panel video-brief">
         <p className="eyebrow">01 / СЦЕНАРИЙ</p><h3>Основа ролика</h3>

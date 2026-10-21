@@ -1,5 +1,8 @@
 'use server';
 import { unstable_rethrow } from 'next/navigation';
+import { forkStoryboard } from '@/lib/production/fork-storyboard';
+import { timedStoryboard } from '@/lib/production/timed-storyboard';
+import { readJob, assertScope } from '@/lib/production/store';
 import { videoContext } from '@/lib/production/context';
 import { selectVisual, fitAllClips } from '@/lib/production/clips';
 import { createJob, editJob, listJobs, workerOnline, queueOperation, selectImageProvider, saveAppearance } from '@/lib/production/store';
@@ -14,6 +17,20 @@ function message(error: unknown) {
   unstable_rethrow(error);
   if (error instanceof Error && !('code' in error) && !(error instanceof SyntaxError)) return error.message;
   return 'Не удалось прочитать или сохранить материалы. Проверьте доступ к локальной папке ScenePilot.';
+}
+export async function previewVideoStoryboard(projectId: string, versionId: string, id: string, revision: number, target: number) {
+  try {
+    const { scope } = await videoContext(projectId, versionId);
+    const job = await readJob(id); assertScope(job, scope);
+    if (job.revision !== revision) throw new Error('Видео изменилось. Обновите состояние.');
+    return { summary: timedStoryboard(job, target).summary };
+  } catch (e) { return { error: message(e) }; }
+}
+export async function createVideoStoryboard(projectId: string, versionId: string, id: string, revision: number, target: number) {
+  try {
+    const { scope } = await videoContext(projectId, versionId);
+    return { job: publicJob(await forkStoryboard(id, scope, revision, target)) };
+  } catch (e) { return { error: message(e) }; }
 }
 export async function videoState(projectId: string, versionId: string) {
   try {

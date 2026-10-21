@@ -3,9 +3,9 @@ import { parseAlignment, type Alignment } from './model';
 export class ProviderError extends Error {
   constructor(message: string, public uncertain = false, public imageTaskFinished = false) { super(message); }
 }
-export type ProviderConfig = { enabled: boolean; elevenKey: string; bflKey: string; cloudflareAccountId?: string; cloudflareToken?: string };
+export type ProviderConfig = { enabled: boolean; elevenKey: string; bflKey: string; cloudflareAccountId?: string; cloudflareToken?: string; geminiKey?: string };
 export function providerConfig(): ProviderConfig {
-  return { enabled: process.env.VIDEO_GENERATION_ENABLED === 'true', elevenKey: process.env.ELEVENLABS_API_KEY || '', bflKey: process.env.BFL_API_KEY || '', cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID || '', cloudflareToken: process.env.CLOUDFLARE_API_TOKEN || '' };
+  return { enabled: process.env.VIDEO_GENERATION_ENABLED === 'true', elevenKey: process.env.ELEVENLABS_API_KEY || '', bflKey: process.env.BFL_API_KEY || '', cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID || '', cloudflareToken: process.env.CLOUDFLARE_API_TOKEN || '', geminiKey: process.env.GEMINI_API_KEY || '' };
 }
 export async function limitedBytes(response: Response, max: number) {
   if (Number(response.headers.get('content-length')) > max) throw new ProviderError('Ответ провайдера слишком велик.', true);

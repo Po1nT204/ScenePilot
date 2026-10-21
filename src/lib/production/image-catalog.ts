@@ -1,5 +1,8 @@
 // Shared UI metadata. IDs pin a provider/model pair; never repoint an existing ID.
 export const imageCatalog = {
+  'google-nano-banana-21': { label: 'Google · Nano Banana 2.1', model: 'gemini-nano-banana-2.1', estimatedUSD: 0.08,
+    terms: 'Платный Gemini API, отдельно от Google Pro/Flow. 1K, 16:9. Оценка $0.08 за запрос; фактическая цена зависит от токенов. Бесплатного API-тарифа нет.',
+    setup: 'GEMINI_API_KEY', url: 'https://aistudio.google.com/api-keys' },
   'cloudflare-sdxl': { label: 'Cloudflare · Stable Diffusion XL', model: '@cf/stabilityai/stable-diffusion-xl-base-1.0', estimatedUSD: 0,
     terms: 'Бесплатная Beta по тарифу на 18.10.2026. Нужен аккаунт Cloudflare и API-токен; доступность и качество проверяются отдельно.',
     setup: 'CLOUDFLARE_ACCOUNT_ID и CLOUDFLARE_API_TOKEN', url: 'https://developers.cloudflare.com/workers-ai/models/stable-diffusion-xl-base-1.0/' },

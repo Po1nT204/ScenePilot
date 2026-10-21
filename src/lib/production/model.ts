@@ -2,7 +2,7 @@
 import { imagePrice, selectedImageProvider, type ImageSelection, type ImageProviderId } from './image-catalog';
 import type { VisualStyle } from './visual-style';
 export const productionLimits = { characters: 5000, shots: 12, prompt: 2000 } as const;
-export const productionRates = { speechPerThousand: 0.08, image: 0.04, checked: '2026-10-18' } as const;
+export const productionRates = { speechPerThousand: 0.08, image: 0.04, checked: '2026-10-21' } as const;
 export type Alignment = { characters: string[]; character_start_times_seconds: number[]; character_end_times_seconds: number[] };
 export type Asset = {
   state: 'empty' | 'requesting' | 'pending' | 'ready' | 'unknown' | 'failed';
@@ -23,12 +23,13 @@ export type VideoJob = {
   imageProvider?: ImageSelection;
   visualStyle?: VisualStyle;
   subtitlesEnabled?: boolean;
+  storyboardFrom?: { id: string; revision: number; target: number };
   output?: string; subtitles?: string; outputStale: boolean;
   operation?: VideoOperation;
   attempts: { id: string; kind: 'speech' | 'image'; shotId?: string; provider?: ImageProviderId; model?: string; estimatedUSD: number; at: string }[];
 };
 export type VideoScope = { ownerId: string; projectId: string; versionId: string };
-export type VideoSetup = { enabled: boolean; speech: boolean; images: boolean; imageProviders?: Record<ImageProviderId, boolean>; workerOnline: boolean };
+export type VideoSetup = { enabled: boolean; speech: boolean; images: boolean; imageProviders?: Partial<Record<ImageProviderId, boolean>>; workerOnline: boolean };
 export type SpeechConnection = { voiceId: string; voiceName: string; tier: string; remainingCharacters: number; checkedAt: string };
 export type ImageConnection = { credits: number; checkedAt: string };
 export type ShotTiming = { start: number; end: number };

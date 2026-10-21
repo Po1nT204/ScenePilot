@@ -78,3 +78,21 @@ test('real FFmpeg renders mixed JPEG/PNG and fitted clips with preserved speech 
     assert.ok(!(await readdir(cwd)).some(name => /-(normalized|cycle)\.mp4$/.test(name)));
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+
+test('real FFmpeg assembles 14 timed shots beyond the initial planner limit', { timeout: 120000 }, async () => {
+  const root = await mkdtemp(join(tmpdir(), 'scenepilot-many-shots-'));
+  try {
+    const job = await createJob({ ownerId: randomUUID(), projectId: randomUUID(), versionId: randomUUID() }, { title: 'Many shots', script: 'a '.repeat(14).trim(), source: 'test', voiceId: 'fixture' }, root);
+    const cwd = jobDirectory(job.id, root), ffmpeg = process.env.FFMPEG_PATH || 'ffmpeg';
+    await runProgram(ffmpeg, ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1.4', '-c:a', 'libmp3lame', 'audio.mp3'], cwd, 30000);
+    await runProgram(ffmpeg, ['-v', 'error', '-f', 'lavfi', '-i', 'color=c=blue:s=320x180', '-frames:v', '1', '-update', '1', 'frame.png'], cwd, 30000);
+    job.audio = { state: 'ready', file: 'audio.mp3' }; job.subtitlesEnabled = false;
+    job.alignment = { characters: job.text.split(''), character_start_times_seconds: job.text.split('').map((_, i) => i * 0.05), character_end_times_seconds: job.text.split('').map((_, i) => (i + 1) * 0.05) };
+    job.shots = Array.from({ length: 14 }, (_, i) => ({ id: randomUUID(), start: i * 2, end: i * 2 + 1, text: 'a', prompt: 'blue', image: { state: 'ready' as const, file: 'frame.png' } }));
+    const result = await renderVideo(job, root, async () => {});
+    await runProgram(ffmpeg, ['-v', 'error', '-i', result.output, '-f', 'null', '-'], cwd, 30000);
+    assert.ok((await readFile(join(cwd, result.output))).length > 1000);
+    assert.ok(!(await readdir(cwd)).some(n => n.endsWith('.txt')));
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
