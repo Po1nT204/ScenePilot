@@ -7,12 +7,14 @@ import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { createJob, jobDirectory, saveJob, readJob } from '../src/lib/production/store';
 import { renderVideo, runProgram } from '../src/lib/production/render';
+import { planShots } from '../src/lib/production/model';
 import { importClip, selectVisual } from '../src/lib/production/clips';
 
 test('real FFmpeg renders mixed JPEG/PNG and fitted clips with preserved speech and subtitles', { timeout: 240000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'scenepilot-render-'));
   try {
     const job = await createJob({ ownerId: randomUUID(), projectId: randomUUID(), versionId: randomUUID() }, { title: 'Fixture', script: 'Тест. Кадр.', source: 'test', voiceId: 'fixture' }, root);
+    job.shots = planShots(job.text).map(s => ({...s,id:randomUUID()})); // Explicit two-shot fixture for mixed formats.
     const cwd = jobDirectory(job.id, root);
     const ffmpeg = process.env.FFMPEG_PATH || 'ffmpeg';
     await runProgram(ffmpeg, ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1.2', '-c:a', 'libmp3lame', 'audio.mp3'], cwd, 30000);

@@ -10,8 +10,8 @@ export async function videoContext(projectId: string, versionId: string) {
   const project = await supabase.from('projects').select('id,title').eq('id', projectId).eq('owner_id', user.id).maybeSingle();
   if (project.error) throw new VideoAccessError();
   if (!project.data) notFound();
-  const version = await supabase.from('script_versions').select('id,version_number,content,source').eq('id', versionId).eq('project_id', projectId).maybeSingle();
+  const version = await supabase.from('script_versions').select('id,version_number,content,source,settings_snapshot').eq('id', versionId).eq('project_id', projectId).maybeSingle();
   if (version.error) throw new VideoAccessError();
   if (!version.data) notFound();
-  return { scope: { ownerId: user.id, projectId, versionId }, project: project.data, version: version.data };
+  return { supabase, scope: { ownerId: user.id, projectId, versionId }, project: project.data, version: version.data };
 }

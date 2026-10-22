@@ -14,20 +14,22 @@ export function IdeaAssistant({ profile, profileId, profileRevision, language, d
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const lock = useRef(false);
+  const history = useRef<string[]>([]);
   async function generate(mode: "test" | "yandex") {
     if (disabled || lock.current) return;
     if (!seed.trim() || seed.trim().length > 1000 || !/^\d+$/.test(duration) || !validDuration(Number(duration))) {
       setMessage(`Укажите направление и длительность от 1 до ${durationLimits.max} секунд.`); return;
     }
-    if (mode === "yandex" && !window.confirm("Отправить направление, язык, длительность и сохранённые требования канала в YandexGPT? Это отдельный платный запрос, до 2000 токенов ответа. Форма ролика не изменится до выбора варианта.")) return;
+    if (mode === "yandex" && !window.confirm("Отправить направление, язык, длительность и сохранённые требования канала и названия последних роликов/вариантов в YandexGPT? Это отдельный платный запрос, до 2000 токенов ответа. Форма ролика не изменится до выбора варианта.")) return;
     lock.current = true; setBusy(true); onBusy(true);
     setMessage(mode === "yandex" ? "YandexGPT предлагает идеи. Ожидание до 45 секунд…" : "Готовим тестовые варианты…");
     try {
-      const response = await suggestIdeas(seed, language, Number(duration), profileId, profileRevision, mode);
+      const response = await suggestIdeas(seed, language, Number(duration), profileId, profileRevision, mode, history.current);
       if (response.error !== undefined) setMessage(response.error);
       else {
+        history.current=[...new Set([...history.current,...response.ideas.map(idea=>idea.title)])].slice(-18);
         setResult({ response, language, duration });
-        setMessage(`Варианты готовы. Выберите один и отредактируйте форму.${response.tokens !== undefined ? ` Токенов: ${response.tokens}.` : ""}`);
+        setMessage(`Варианты готовы. Выберите один и отредактируйте форму.${response.warning ? ` ${response.warning}` : ""}${response.tokens !== undefined ? ` Токенов: ${response.tokens}.` : ""}`);
       }
     } catch { setMessage("Не удалось получить идеи. Форма ролика не изменена; проверьте соединение и вход."); }
     finally { lock.current = false; setBusy(false); onBusy(false); }

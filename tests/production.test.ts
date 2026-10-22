@@ -79,7 +79,7 @@ test('active clips replace missing pictures in budget/readiness and generation, 
   await assert.rejects(editJob(job.id, scope, 0, j => selectVisual(j, j.shots[0].id, 'clip', 'loop'), root), /изменилось/);
   await assert.rejects(importClip(job.id, scope, job.revision, job.shots[0].id, Buffer.from('not an MP4 file'), root), /Нужен MP4/);
 }));
-const input = { title: 'Pilot', script: 'A quiet city. The sun rises. People open their windows.', source: 'manual', voiceId: 'testVoice', imageProvider: 'bfl-flux11' as const };
+const input = { title: 'Pilot', script: 'A quiet city wakes as the early morning light reaches every empty street and the old station. The sun rises above the rooftops while a distant train arrives beside the river under a clear sky. People open their windows and listen to the birds as the first shops begin another day of work.', source: 'manual', voiceId: 'testVoice', imageProvider: 'bfl-flux11' as const };
 function alignment(text: string): Alignment {
   return { characters: text.split(''), character_start_times_seconds: text.split('').map((_, i) => i * 0.05), character_end_times_seconds: text.split('').map((_, i) => (i + 1) * 0.05) };
 }
@@ -672,3 +672,30 @@ test('free synchronous generation still obeys disabled flag and unknown-result p
   assert.equal(job.shots[0].image.state, 'unknown'); assert.deepEqual(calls, ['POST']);
   assert.throws(() => queueOperation(job, { kind: 'generate', budgetUSD: 1, reservedUSD: 0 }, true), /неизвестен/);
 }));
+
+
+test('TTS rejections explain payment and quota without retries or raw error leaks', async () => {
+  for (const field of ['code', 'status']) {
+    for (const [code, hint] of [['payment_required', /Voice Library/], ['quota_exceeded', /квоты/], ['insufficient_credits', /кредитов/], ['missing_permission', /Text to Speech: Access/]] as const) {
+      let calls = 0;
+      await assert.rejects(synthesize('Test speech.', 'testVoice', 'fixture-key', async () => {
+        calls++;
+        return Response.json({ detail: { [field]: code, message: 'SECRET private input' } }, { status: 402 });
+      }), error => {
+        assert.ok(error instanceof ProviderError); assert.equal(error.uncertain, false);
+        assert.match(error.message, /HTTP 402/); assert.match(error.message, hint);
+        assert.ok(error.message.includes(code)); assert.doesNotMatch(error.message, /SECRET/); return true;
+      });
+      assert.equal(calls, 1);
+    }
+  }
+  for (const body of ['SECRET', JSON.stringify({detail:{code:'SECRET',message:'SECRET'}}), 'x'.repeat(65000)]) {
+    await assert.rejects(synthesize('Test speech.', 'testVoice', 'fixture-key', async () => new Response(body, {status:402})), error => {
+      assert.match(String(error), /HTTP 402.*Точная причина не распознана/);
+      assert.doesNotMatch(String(error), /SECRET/); return true;
+    });
+  }
+  await assert.rejects(synthesize('Test speech.', 'testVoice', 'fixture-key', async () => Response.json({detail:{code:'payment_required'}}, {status:503})), error => {
+    assert.ok(error instanceof ProviderError); assert.equal(error.uncertain,true); return true;
+  });
+});

@@ -12,8 +12,8 @@ function getYandexConfig() {
  return {apiKey:process.env.YANDEX_API_KEY!.trim(),folderId:process.env.YANDEX_FOLDER_ID!,model};
 }
 
-export async function generateYandexScript(brief: ScriptBrief) {
- return requestYandexScript(getYandexConfig(),brief);
+export async function generateYandexScript(brief: ScriptBrief, draft?: string) {
+ return requestYandexScript(getYandexConfig(),brief,fetch,draft);
 }
 export async function generateYandexScenes(content:string,brief:ScriptBrief) {
  return requestYandexScenes(getYandexConfig(),content,brief);

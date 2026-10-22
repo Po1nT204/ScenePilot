@@ -1,11 +1,14 @@
 "use client";
 import { useEffect, useId, useRef, useState } from "react";
-import { generateSceneExamples, saveScenes } from "@/app/projects/[id]/scenes/actions";
+import { generateSceneExamples, saveScenes, readSavedScenes } from "@/app/projects/[id]/scenes/actions";
 import { addScene, moveScene, removeScene, stableSceneEditsPayload, type SceneEdit, type EditorScene } from "@/lib/scene-editing";
 import Link from 'next/link';
 import { sourceLabel } from "@/lib/export";
 import {NarrationMeter} from "./narration-meter";
-import {supportsFullGeneration,longGenerationMessage} from "@/lib/duration";
+import {supportsFullGeneration,longGenerationMessage,sceneGenerationOptions} from "@/lib/duration";
+
+import { SceneImport } from './scene-import';
+import { sameSceneText } from '@/lib/scene-save';
 
 const labels = { description: "Описание эпизода", visual_prompt: "Визуальный промпт эпизода", narration: "Текст озвучки" };
 const signature = (scenes: SceneEdit[]) => JSON.stringify(scenes.map(({id,description,visual_prompt,narration,source}) => ({id,description,visual_prompt,narration,source})));
@@ -57,15 +60,38 @@ export function SceneEditor({projectId,versionId,initial,yandexEnabled,scriptCon
   focus(neighbor ? `scene-${neighbor.key}-heading` : "add-scene");
  }
 
+ function downloadDraft() {
+  const payload = scenes.map(({description,visual_prompt,narration}) => ({description,visual_prompt,narration}));
+  const url=URL.createObjectURL(new Blob([JSON.stringify({scenes:payload},null,2)],{type:'application/json'}));
+  const link=document.createElement('a'); link.href=url; link.download='scenes-draft.json'; link.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+ }
+ async function verifySaved() {
+  if(lock.current) return; lock.current=true; setBusy(true);
+  try {
+   const result=await readSavedScenes(projectId,versionId), payload=stableSceneEditsPayload(scenes);
+   if(result.error) setMessage(result.error);
+   else if(payload && sameSceneText(payload,result.scenes!)) {
+    setScenes(scenes.map((scene,i)=>({...scene,...result.scenes![i]}))); setBaseline(signature(result.scenes!)); setConfirmedDeleteIds([]);
+    setMessage('Проверено чтением: все текущие сцены уже сохранены. Повторная запись не выполнялась.');
+   } else setMessage('В базе другой набор сцен. Ваш черновик оставлен. Скачайте его перед обновлением страницы; запись не выполнялась.');
+  } catch {setMessage('Не удалось проверить сохранение. Черновик оставлен.');}
+  finally {lock.current=false;setBusy(false);}
+ }
+ function importScenes(imported:SceneEdit[]) {
+  if(lock.current || hasShots) return;
+  if(scenes.length && !window.confirm('Заменить черновик импортированными сценами? Сохранённый набор изменится только после сохранения.')) return;
+  setScenes(imported.map(scene=>({...scene,key:crypto.randomUUID()})));setConfirmedDeleteIds([]);
+  setMessage('Сцены вставлены как внешний ручной материал. Проверьте озвучку и нажмите «Сохранить сцены».');
+ }
  async function run(mode:"test"|"yandex"|"save") {
   if(lock.current) return;
   if(mode !== 'save' && hasShots) {setMessage('У сцен есть кадры. Редактируйте эпизоды вручную; замена всего набора генерацией недоступна.');return;}
   if(mode === "yandex" && !supportsFullGeneration(targetDuration)) {setMessage(longGenerationMessage);return;}
   if(mode === "save" && (!dirty || !valid)) return;
   if (mode === "save" && !scenes.length && !window.confirm("Удалить все сохранённые сцены этой версии? Сценарий и другие версии останутся без изменений. Истории сцен для восстановления нет.")) return;
-  if (mode === "yandex" && !window.confirm("Отправить сохранённую версию сценария в Yandex? Это платный запрос до 4000 токенов ответа. Результат заменит редактор сцен, но сохранённый набор изменится только после сохранения.")) return;
+  if (mode === "yandex" && !window.confirm(`Отправить сохранённую версию сценария в Yandex? Это платный запрос до ${sceneGenerationOptions(scriptContent).maxTokens} токенов ответа. Озвучка должна сохраниться дословно; результат заменит редактор после проверки.`)) return;
   if (mode === "test" && scenes.length && !window.confirm("Заменить текущий текст сцен тестовым набором? Сохранённый набор изменится только после нажатия «Сохранить сцены».")) return;
-  lock.current = true; setBusy(true); setMessage(mode === "yandex" ? "YandexGPT создаёт сцены. Ожидание — до 45 секунд…" : "Выполняем запрос…");
+  lock.current = true; setBusy(true); setMessage(mode === "yandex" ? `YandexGPT создаёт сцены. Ожидание — до ${sceneGenerationOptions(scriptContent).timeoutMs/1000} секунд…` : "Выполняем запрос…");
   try {
    if(mode !== "save") {
     const result = await generateSceneExamples(projectId,versionId,mode);
@@ -95,6 +121,8 @@ export function SceneEditor({projectId,versionId,initial,yandexEnabled,scriptCon
    <button type="button" className="text-button" disabled={busy || hasShots} onClick={() => run("test")}>Тестовые сцены · бесплатно</button>
    <button type="button" className="text-button" disabled={busy || hasShots || !yandexEnabled || !supportsFullGeneration(targetDuration)} onClick={() => run("yandex")}>Сцены YandexGPT · платно</button>
   </div>
+  <div className="editor-actions"><button type="button" className="text-button" onClick={() => void verifySaved()} disabled={busy}>Проверить сохранение · без записи</button><button type="button" className="text-button" onClick={downloadDraft} disabled={busy || !scenes.length}>Скачать черновик сцен</button></div>
+  <SceneImport disabled={busy || hasShots} onImport={importScenes} />
   {!yandexEnabled && <p className="editor-note">YandexGPT выключен или не настроен.</p>}
   {hasShots && <p className="editor-note">У эпизодов есть кадры. Генерация замены отключена; ручные правки и порядок доступны.</p>}
   {!supportsFullGeneration(targetDuration) && <p className="editor-note">Для цели свыше 5 минут сцены Yandex пока недоступны. Можно добавить их вручную или использовать бесплатное разбиение.</p>}

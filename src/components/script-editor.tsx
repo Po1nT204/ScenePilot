@@ -25,22 +25,22 @@ export function ScriptEditor({ projectId, initial, versionNumber, initialSource,
  const handled = useRef<string | undefined>(undefined);
  const dirty = (content !== initial || pace!==String(initialPace ?? narrationPace.default)) && !state.savedId;
  const busy = pending || generating;
- async function generate(mode: "test" | "yandex") {
+ async function generate(mode: "test" | "yandex", revise = false) {
   if (generationLock.current || pending || state.savedId) return;
   if(!target || !options) {setGenerationMessage('Укажите корректные цель и темп чтения.');return;}
-  if (mode === "yandex" && !window.confirm(`Отправить настройки проекта и требования канала в Yandex? Один платный запрос, максимум ${options.maxTokens} токенов ответа. Ориентир — ${target.words} слов при ${target.pace} слов/мин. Результат заменит черновик. Сохранённые версии останутся.`)) return;
+  if (mode === "yandex" && !window.confirm(`${revise ? "Отправить текущий черновик для доработки объёма вместе с настройками" : "Отправить настройки проекта и требования канала"} в Yandex? Один платный запрос, максимум ${options.maxTokens} токенов ответа. Ориентир — ${target.words} слов при ${target.pace} слов/мин. Результат заменит черновик. Сохранённые версии останутся.`)) return;
   if (mode === "test" && content.trim() && !window.confirm("Заменить текст в редакторе тестовым примером? Несохранённые правки будут потеряны. Сохранённые версии останутся без изменений.")) return;
   generationLock.current = true;
   setGenerating(true);
   setGenerationMessage(mode === "yandex" ? `YandexGPT пишет сценарий. Ожидание — до ${options.timeoutMs/1000} секунд…` : "Готовим тестовый пример…");
   try {
-   const result = await generateScriptExample(projectId,mode,paceNumber);
+   const result = await generateScriptExample(projectId,mode,paceNumber,revise ? content : undefined);
    if (result.error !== undefined) setGenerationMessage(result.error);
    else {
     setContent(result.content);
     setSource(mode);
     const deviation=narrationDeviation(result.content,target.words);
-    setGenerationMessage(`${mode === "test" ? "Тестовый пример (объём не подгоняется)" : "Сценарий YandexGPT"}: ${deviation.words} слов, цель ${target.words}, отклонение ${deviation.percent>0?'+':''}${deviation.percent}%. Ещё не сохранён.${result.tokens !== undefined ? ` Всего токенов: ${result.tokens}.` : ""}`);
+    setGenerationMessage(`${mode === "test" ? "Тестовый пример (объём не подгоняется)" : "Сценарий YandexGPT"}: ${deviation.words} слов, цель ${target.words}, отклонение ${deviation.percent>0?'+':''}${deviation.percent}%. Ещё не сохранён.${result.warning ? ` ${result.warning}` : ""}${result.tokens !== undefined ? ` Всего токенов: ${result.tokens}.` : ""}`);
    }
   } catch {
    setGenerationMessage("Не удалось получить пример. Проверьте соединение и вход в аккаунт. Текст не изменён.");
@@ -71,6 +71,7 @@ export function ScriptEditor({ projectId, initial, versionNumber, initialSource,
   <div className="editor-actions" aria-label="Действия со сценарием">
    <button className="button" type="submit" disabled={busy || !!state.savedId || !paceValid || !content.trim()}>{pending ? "Сохраняем…" : "Сохранить новую версию"}</button>
    <button className="text-button" type="button" onClick={() => generate("yandex")} disabled={!yandexEnabled || !options || !paceValid || busy || !!state.savedId}>YandexGPT · платно</button>
+   <button className="text-button" type="button" onClick={() => generate("yandex",true)} disabled={!yandexEnabled || !content.trim() || !options || !paceValid || busy || !!state.savedId}>Доработать объём · платно</button>
    <button className="text-button" type="button" onClick={() => generate("test")} disabled={!paceValid || busy || !!state.savedId}>Тестовый пример · бесплатно</button>
   </div>
   {!yandexEnabled && <p className="editor-note">YandexGPT выключен или не настроен.</p>}

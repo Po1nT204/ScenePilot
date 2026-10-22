@@ -22,13 +22,51 @@ export async function limitedBytes(response: Response, max: number) {
   } finally { await reader.cancel().catch(() => {}); }
   return Buffer.concat(parts);
 }
+export async function speechRejectionHint(response: Response, permission: string) {
+  const hints: Record<string, string> = {
+    payment_required: 'Требуется оплата или другой доступный голос. На Free голоса из Voice Library недоступны через API даже при остатке кредитов. Проверьте тип голоса, тариф и лимит ключа; смена VPN это ограничение не снимает.',
+    quota_exceeded: 'Недостаточно квоты для этого текста. Проверьте остаток аккаунта и ограничение расходов API-ключа. Повтор без изменения условий не поможет.',
+    insufficient_credits: 'Недостаточно кредитов для этого запроса. Проверьте баланс аккаунта и лимит API-ключа.',
+    voice_not_found: 'Голос не найден для этого аккаунта. Добавьте нужный голос в My Voices и скопируйте его Voice ID. Если ID изменился, создайте новую сборку: существующая хранит прежний голос.',
+    invalid_voice_id: 'Неверный Voice ID. Скопируйте идентификатор через Copy voice ID в My Voices, затем создайте новую сборку.',
+    voice_access_denied: 'Аккаунт не имеет доступа к этому голосу. Проверьте его доступность в My Voices или выберите другой голос.',
+    subscription_required: 'Для этого действия требуется платная подписка. Проверьте условия выбранного голоса; для теста можно выбрать голос, доступный вашему тарифу.',
+    paid_plan_required: 'Для этого действия требуется платный тариф. Проверьте условия выбранного голоса или выберите доступный голос.',
+    feature_not_available: 'Эта возможность недоступна на текущем тарифе. Проверьте условия выбранного голоса.',
+    missing_permission: `У ключа нет нужного разрешения. Проверьте ${permission}.`,
+    insufficient_permissions: `У ключа нет нужного разрешения. Проверьте ${permission}.`,
+    invalid_api_key: 'Ключ API отклонён. Проверьте ключ и срок его действия.',
+    invalid_parameters: 'API отклонил параметры запроса. Проверьте выбранный Voice ID; повтор без изменения параметров может не помочь.',
+  };
+  // Only known codes are exposed. Raw provider messages may contain private data.
+  try {
+    const value: unknown = JSON.parse((await limitedBytes(response, 64000)).toString('utf8'));
+    if (value && typeof value === 'object' && 'detail' in value) {
+      const detail = value.detail;
+      if (detail && typeof detail === 'object') {
+        const code = 'code' in detail ? detail.code : 'status' in detail ? detail.status : undefined;
+        if (typeof code === 'string' && Object.hasOwn(hints, code)) return `${code}: ${hints[code]}`;
+      }
+    }
+  } catch { /* Keep the HTTP status even if the error body is unreadable or too large. */ }
+  finally { await response.body?.cancel().catch(() => {}); }
+  if (response.status === 400 || response.status === 422) return 'API отклонил запрос. Точная причина не распознана; проверьте Voice ID и доступность голоса в аккаунте.';
+  if (response.status === 401) return `Проверьте ключ, срок действия и разрешение ${permission}.`;
+  if (response.status === 403) return `Проверьте доступ из вашей страны и разрешение ${permission}.`;
+  if (response.status === 404) return 'Голос не найден. Добавьте его в My Voices и скопируйте Voice ID.';
+  if (response.status === 402) return 'Запрос отклонён по условиям оплаты или доступа. Проверьте квоту, лимит ключа и голос: на Free голоса Voice Library недоступны через API. Точная причина не распознана.';
+  if (response.status === 429) return 'Лимит запросов. Повторите проверку позже вручную.';
+  return 'Сервис не выполнил запрос. Повторите проверку позже вручную.';
+}
+
 async function request(url: string, options: RequestInit, transport: typeof fetch, name: string) {
   let response: Response;
   try { response = await transport(url, { ...options, redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(120000) }); }
   catch { throw new ProviderError(`${name}: соединение прервано. Новый запрос автоматически не отправлен.`, true); }
   if (!response.ok) {
+    const hint = name === 'ElevenLabs' ? await speechRejectionHint(response, 'Text to Speech: Access') : 'Проверьте доступ, баланс и настройки сервиса.';
     await response.body?.cancel().catch(() => {});
-    throw new ProviderError(`${name}: HTTP ${response.status}. Проверьте доступ, баланс и настройки сервиса.`, response.status >= 500 || response.status === 408);
+    throw new ProviderError(`${name}: HTTP ${response.status}. ${hint}`, response.status >= 500 || response.status === 408);
   }
   return response;
 }

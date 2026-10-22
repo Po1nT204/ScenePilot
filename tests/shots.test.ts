@@ -41,7 +41,7 @@ test('word target and deviation follow chosen pace, not a fixed duration claim',
  for(const pace of [79,221,140.5,NaN]) assert.throws(()=>narrationTarget(30,pace));
  assert.deepEqual(scriptGenerationOptions(301),{maxTokens:'6000',timeoutMs:90000});
  assert.equal(scriptGenerationOptions(301,'yandexgpt-5-lite'),null);
- assert.deepEqual(scriptGenerationOptions(300),{maxTokens:'2000',timeoutMs:45000});
+ assert.deepEqual(scriptGenerationOptions(300),{maxTokens:'4000',timeoutMs:90000});
 });
 test('script prompt gets pace and word range; invalid input and Lite long request never call transport',async()=>{
  const config={apiKey:'TEST',folderId:'test',model:'yandexgpt-5.1'};

@@ -34,4 +34,4 @@ export function generateTestScript(brief: ScriptBrief): string {
  ].join("\n\n");
 }
 
-export type GenerationResult = { content: string; tokens?: number; error?: never } | { error: string; content?: never; tokens?: never };
+export type GenerationResult = { content: string; tokens?: number; warning?: string; error?: never } | { error: string; content?: never; tokens?: never };

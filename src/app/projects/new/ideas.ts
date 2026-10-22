@@ -6,7 +6,8 @@ import { generateYandexIdeas } from "@/lib/ai/yandex";
 import { GenerationError } from "@/lib/ai/yandex-client";
 import { durationLimits } from "@/lib/duration";
 
-export async function suggestIdeas(seed: string, language: string, duration: number, profileId: string | null, profileRevision: string | null, mode: "test" | "yandex"): Promise<IdeaResult> {
+export async function suggestIdeas(seed: string, language: string, duration: number, profileId: string | null, profileRevision: string | null, mode: "test" | "yandex", previousTitles: string[] = []): Promise<IdeaResult> {
+  if(!Array.isArray(previousTitles) || previousTitles.length>18 || !previousTitles.every(t=>typeof t==='string' && t.length<=120)) return {error:'Некорректная история вариантов.'};
   const checked = validateIdeaRequest(seed, language, duration);
   if (!checked || !["test", "yandex"].includes(mode)) return { error: `Укажите направление до 1000 символов, язык и длительность от 1 до ${durationLimits.max} секунд.` };
   const { supabase, user } = await requireProjectUser();
@@ -22,7 +23,9 @@ export async function suggestIdeas(seed: string, language: string, duration: num
       channel = channelSnapshot(profile.data);
       if (!channel) return { error: "Исправьте настройки профиля перед генерацией." };
     }
-    const request = { ...checked, channel };
+    const recent = mode === 'yandex' ? await supabase.from('projects').select('title').eq('owner_id',user.id).order('created_at',{ascending:false}).limit(12) : null;
+    if(recent?.error) return {error:'Не удалось прочитать последние названия для исключения повторов. Запрос к модели не отправлен.'};
+    const request = { ...checked, channel, previousTitles:[...new Set([...(recent?.data ?? []).map(p=>p.title),...previousTitles])] };
     if (mode === "test") return { ideas: testIdeas(request), source: "test" };
     return { ...await generateYandexIdeas(request), source: "yandex" };
   } catch (error) {

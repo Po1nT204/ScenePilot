@@ -23,8 +23,9 @@ export function TimedStoryboard({ job, projectId, versionId, disabled, onCreated
     finally { onBusy(false); }
   }
   return <details className="video-connection">
-    <summary>Больше разных кадров по ходу речи</summary>
+    <summary>Разделить длинные кадры · необязательно</summary>
     <p>Делит длинные кадры по готовой озвучке. Это необязательный шаг: подгонка клипов работает и без него. Текст и голос сохраняются.</p>
+    <p className="video-muted">Разделение не придумывает новые ракурсы: описания наследуются от исходного кадра. Перед генерацией задайте каждому новому кадру отдельный визуальный смысл. Независимые генерации Cloudflare могут менять лица и детали; одинаковый промпт не гарантирует единого персонажа.</p>
     <label htmlFor="storyboard-target">Ориентир длительности кадра</label>
     <select id="storyboard-target" value={target} disabled={disabled} onChange={e => { setTarget(Number(e.target.value)); setSummary(undefined); }}>
       {storyboardTargets.map(n => <option key={n} value={n}>{n} секунд</option>)}

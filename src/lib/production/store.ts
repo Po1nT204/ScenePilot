@@ -2,8 +2,10 @@ import { mkdir, readFile, writeFile, rename, readdir, open, unlink, stat } from 
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
-import { type VideoJob, type VideoScope, type VideoOperation, planShots, validVoice, validateNarration, assetsReady, estimatedCost, hasVisual, createsImages, createsMaterials } from './model';
+import { type VideoJob, type VideoScope, type VideoOperation, validVoice, assetsReady, estimatedCost, hasVisual, createsImages, createsMaterials } from './model';
 import { type ImageSelection, validImageSelection, selectedImageProvider } from './image-catalog';
+import { initialStoryboard } from './initial-storyboard';
+import type { SceneEdit } from '../scene-editing';
 import { imagePrompt, validVisualStyle } from './visual-style';
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -68,12 +70,14 @@ export async function listJobs(scope?: VideoScope, root = productionRoot()) {
   }
   return jobs.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
-export async function createJob(scope: VideoScope, input: { title: string; script: string; source: string; voiceId: string; imageProvider?: ImageSelection }, root = productionRoot()) {
+export async function createJob(scope: VideoScope, input: { title: string; script: string; source: string; voiceId: string; imageProvider?: ImageSelection; pace?: number; scenes?: SceneEdit[] }, root = productionRoot()) {
   if (![scope.ownerId, scope.projectId, scope.versionId].every(validJobId) || !validVoice(input.voiceId)) throw new Error('Укажите корректный Voice ID ElevenLabs.');
   if (!validImageSelection(input.imageProvider ?? 'none')) throw new Error('Неизвестный модуль изображений.');
-  const job: VideoJob = { schema: 1, id: randomUUID(), ...scope, ...input, imageProvider: input.imageProvider ?? 'none', text: validateNarration(input.script),
+  const plan = initialStoryboard(input.script, input.pace, input.scenes);
+  const { pace: _pace, scenes, ...base } = input; void _pace;
+  const job: VideoJob = { schema: 1, id: randomUUID(), ...scope, ...base, planSource:scenes ? 'scenes' : 'script', sceneSnapshot:scenes ? structuredClone(scenes) : undefined, versionScript:scenes ? input.script : undefined, imageProvider: input.imageProvider ?? 'none', text: plan.text,
     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), revision: 0, status: 'draft', message: 'План сохранён. Проверьте описание каждого кадра.',
-    shots: planShots(input.script).map(s => ({ ...s, id: randomUUID() })), audio: { state: 'empty' }, outputStale: false, attempts: [] };
+    shots: plan.shots.map(s => ({ ...s, id: randomUUID() })), audio: { state: 'empty' }, outputStale: false, attempts: [] };
   await mkdir(jobDirectory(job.id, root), { recursive: true }); await saveJob(job, root); return job;
 }
 export async function editJob(id: string, scope: VideoScope, revision: number, edit: (job: VideoJob) => void | Promise<void>, root = productionRoot()) {

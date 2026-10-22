@@ -3,8 +3,8 @@ import { projectLimits } from "./projects/validation";
 import { validDuration } from "./duration";
 
 export type Idea = { title: string; topic: string; genre: string; style: string };
-export type IdeaRequest = { seed: string; language: string; duration: number; channel: ChannelProfile | null };
-export type IdeaResult = { ideas: Idea[]; source: "test" | "yandex"; tokens?: number; error?: never } | { error: string; ideas?: never; source?: never; tokens?: never };
+export type IdeaRequest = { seed: string; language: string; duration: number; channel: ChannelProfile | null; previousTitles?: string[] };
+export type IdeaResult = { ideas: Idea[]; source: "test" | "yandex"; tokens?: number; warning?: string; error?: never } | { error: string; ideas?: never; source?: never; tokens?: never };
 
 export function validateIdeaRequest(seed: unknown, language: unknown, duration: unknown) {
   if (typeof seed !== "string" || !seed.trim() || seed.trim().length > 1000) return null;

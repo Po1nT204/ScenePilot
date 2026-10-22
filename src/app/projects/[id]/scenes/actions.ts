@@ -6,7 +6,8 @@ import { testScenes, validScenes, type SceneDraft } from "@/lib/scenes";
 import {generateYandexScenes} from "@/lib/ai/yandex";
 import {GenerationError} from "@/lib/ai/yandex-client";
 import { stableSceneEditsPayload, type SceneEdit } from "@/lib/scene-editing";
-import { shotsMigrationMessage } from "@/lib/shots";
+import { saveScenesOnce } from "@/lib/scene-save";
+import { unstable_rethrow } from "next/navigation";
 async function ownedVersion(projectId: string, versionId: string) {
  const { supabase, user } = await requireProjectUser();
  if (!isProjectId(projectId) || !isProjectId(versionId)) throw new Error("Invalid id");
@@ -36,12 +37,28 @@ export async function saveScenes(projectId: string, versionId: string, scenes: u
  if (!payload) return { error: "Допустимо до 12 сцен с указанным источником. Каждое поле должно содержать от 1 до 2000 символов." };
  try {
   const { supabase } = await ownedVersion(projectId,versionId);
-  const { data, error } = await supabase.rpc("save_scene_edits_with_ids", { p_version_id: versionId, p_scenes: payload, p_confirm_delete_ids: confirmedDeleteIds });
-  if (error) return { error: error.code === "PGRST202" ? shotsMigrationMessage : error.message.includes("SHOT_DELETE_CONFIRMATION_REQUIRED") ? "У удаляемой сцены есть сохранённые кадры. Обновите страницу, проверьте их и подтвердите удаление сцены вместе с кадрами." : "Не удалось сохранить сцены. Правки остаются в редакторе; проверьте сохранённый набор перед повтором." };
-  if (!stableSceneEditsPayload(data)) return {error:"Ответ сохранения не распознан. Обновите страницу для проверки результата."};
+  const result = await saveScenesOnce(payload,
+   () => supabase.rpc("save_scene_edits_with_ids", { p_version_id: versionId, p_scenes: payload, p_confirm_delete_ids: confirmedDeleteIds }),
+   async () => {
+    const current = await supabase.from("scenes").select("id,description,visual_prompt,narration,source").eq("script_version_id",versionId).order("position");
+    const parsed = current.error ? null : stableSceneEditsPayload(current.data);
+    if (!parsed) throw new Error('Read failed');
+    return parsed;
+   });
+  if (result.error) return result;
   revalidatePath(`/projects/${projectId}/scenes`);
   revalidatePath(`/projects/${projectId}/export`);
   revalidatePath("/projects");
-  return { error: "", scenes: data };
- } catch { return { error: "Соединение прервано или версия недоступна. Правки остаются в редакторе." }; }
+  return result;
+ } catch (error) { unstable_rethrow(error); return { error: "Соединение прервано или версия недоступна. Правки остаются в редакторе. Скачайте черновик перед перезагрузкой; проверьте сохранение после восстановления связи." }; }
+}
+
+export async function readSavedScenes(projectId: string, versionId: string): Promise<{error:string;scenes?:SceneEdit[]}> {
+ try {
+  const {supabase} = await ownedVersion(projectId,versionId);
+  const result = await supabase.from('scenes').select('id,description,visual_prompt,narration,source').eq('script_version_id',versionId).order('position');
+  const scenes = result.error ? null : stableSceneEditsPayload(result.data);
+  if (!scenes) return {error:'Сохранённые сцены не удалось прочитать. Черновик оставлен; повторите проверку после восстановления связи.'};
+  return {error:'',scenes};
+ } catch(error) { unstable_rethrow(error); return {error:'Не удалось проверить сохранение. Черновик оставлен.'}; }
 }

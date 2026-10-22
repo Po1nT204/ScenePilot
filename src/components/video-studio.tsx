@@ -21,6 +21,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
   const [setup, setSetup] = useState(initialSetup), [voice, setVoice] = useState(defaultVoice);
   const [stage, setStage] = useState<'plan' | 'frames' | 'result'>(initialJobs[0]?.output ? 'result' : initialJobs.length ? 'frames' : 'plan');
   const [storyboardBusy, setStoryboardBusy] = useState(false);
+  const [planSource, setPlanSource] = useState<'script' | 'scenes'>('script');
   const [showConnections, setShowConnections] = useState(false);
   const [error, setError] = useState(''), [pending, startTransition] = useTransition();
   const [drafts, setDrafts] = useState<Record<string, string>>({}), [draftRevision, setDraftRevision] = useState<number>();
@@ -76,7 +77,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
     if (dirty && !window.confirm('Описания кадров не сохранены. Открыть новую сборку?')) return;
     startTransition(async () => {
       setError('');
-      try { const result = await newVideo(projectId, versionId, voice, provider); if (result.error) setError(result.error); else { putJob(result.job!); setDrafts({}); setDraftRevision(undefined); setStage('frames'); } }
+      try { const result = await newVideo(projectId, versionId, voice, provider, planSource); if (result.error) setError(result.error); else { putJob(result.job!); setDrafts({}); setDraftRevision(undefined); setStage('frames'); } }
       catch { setError('Не удалось создать план. Попробуйте позже.'); }
     });
   }
@@ -207,6 +208,8 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
       <button type="button" className="button secondary" disabled={!!busy || !setup.speech || !checkVoice} onClick={checkConnection}>Проверить ElevenLabs · без генерации</button>
       <p className="video-muted">Проверяется {job ? 'сохранённый голос этой сборки' : 'Voice ID из поля ниже'}: {checkVoice || 'не указан'}. Разрешения ключа: User — Read, Voices — Read; для озвучки также Text to Speech — Access.</p>
       {checkedConnection && <div role="status"><p>API ответил · голос: <strong>{checkedConnection.voiceName}</strong> · тариф: {checkedConnection.tier}. Остаток квоты по данным API: {checkedConnection.remainingCharacters.toLocaleString('ru-RU')}. Проверено: {new Date(checkedConnection.checkedAt).toLocaleTimeString('ru-RU')}.</p><p className="video-muted">Это проверка сведений о подписке и голосе. Она не подтверждает разрешение генерации, качество озвучки или лимит конкретного ключа. Права на публикацию и расход проверяйте в кабинете ElevenLabs.</p></div>}
+      {checkedConnection?.tier === 'free' && <p role="note">На Free голоса из Voice Library недоступны через API, даже если на сайте они работают и кредиты остались. Для теста выберите голос с доступом к API на вашем тарифе; добавление в My Voices само по себе ограничение не снимает. <a href="https://elevenlabs.io/docs/eleven-creative/voices/voice-library" target="_blank" rel="noreferrer">Условия ElevenLabs</a></p>}
+      {checkedConnection && job && <p className="video-muted">Текст этой сборки: {job.text.length.toLocaleString('ru-RU')} символов. Остаток квоты не учитывает возможную надбавку за голос и отдельный лимит API-ключа.</p>}
       <label htmlFor="video-image-provider">Модуль изображений</label>
       <select id="video-image-provider" value={provider} disabled={!!busy || dirty} onChange={e => changeImageProvider(e.target.value as ImageSelection)}>
         <option value="none">Выберите сервис — без автоматического выбора</option>
@@ -243,11 +246,13 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
       <section id="video-stage-plan" aria-label="Сценарий" hidden={stage !== 'plan'} className="video-panel video-brief">
         <p className="eyebrow">01 / СЦЕНАРИЙ</p><h3>Основа ролика</h3>
         <p className="video-script">{job?.text || script}</p>
-        <p className="video-muted">{(job?.text || script).length} символов · сохранённая версия сценария<br />Источник: {({ manual: 'ручной ввод', test: 'тестовый шаблон', yandex: 'YandexGPT' } as Record<string, string>)[job?.source || scriptSource] || 'не указан'}</p>
+        <p className="video-muted">{(job?.text || script).length} символов · {job?.planSource === 'scenes' ? 'озвучка сохранённых сцен' : 'сохранённый сценарий'}<br />Источник: {({ manual: 'ручной ввод', test: 'тестовый шаблон', yandex: 'YandexGPT', mixed: 'смешанные источники сцен' } as Record<string, string>)[job?.source || scriptSource] || 'не указан'}</p>
+        <label htmlFor="video-plan-source">Основа новой сборки</label><select id="video-plan-source" value={planSource} disabled={!!busy} onChange={e => setPlanSource(e.target.value as 'script' | 'scenes')}><option value="script">Сохранённый сценарий</option><option value="scenes">Сохранённые сцены: их озвучка и промпты</option></select>
+        <p className="video-muted">{planSource === 'scenes' ? 'Одна сохранённая сцена — один кадр с её полным текстом и промптом. 12 сцен дадут 12 кадров. Длинный кадр можно оживить локальным движением картинки или автоподгонкой клипа. Это не создаёт новых действий персонажа.' : 'Текст делится примерно по 8 секунд с учётом темпа чтения. Это черновые места для изображений, а не продуманная режиссура. Если сцены уже готовы, выберите их источником, чтобы сохранить ваши визуальные описания.'} Дополнительное дробление доступно отдельно после озвучки. Старые сборки не изменяются; новая сборка не переносит их материалы.</p>
         <label htmlFor="video-voice">Voice ID ElevenLabs</label><input id="video-voice" value={voice} onChange={e => setVoice(e.target.value)} maxLength={100} disabled={!!busy} />
         <p className="video-muted">Для новой сборки. {job ? `Текущая сборка использует голос ${job.voiceId}. Для смены голоса создайте новую сборку.` : 'В ElevenLabs откройте My Voices → меню голоса → Copy voice ID.'}</p>
-        <button type="button" className="button" disabled={!!busy || !voice.trim() || normalizeNarration(script).length > productionLimits.characters} onClick={create}>{job ? 'Новая сборка' : 'Подготовить кадры'} <span aria-hidden="true">→</span></button>
-        {normalizeNarration(script).length > productionLimits.characters && <p role="alert">Первый вариант производства рассчитан на сценарий до {productionLimits.characters} символов. Сохраните короткую версию для проверки.</p>}
+        <button type="button" className="button" disabled={!!busy || !voice.trim() || (planSource === 'script' && normalizeNarration(script).length > productionLimits.characters)} onClick={create}>{job ? 'Новая сборка' : 'Подготовить кадры'} <span aria-hidden="true">→</span></button>
+        {planSource === 'script' && normalizeNarration(script).length > productionLimits.characters && <p role="alert">Первый вариант производства рассчитан на сценарий до {productionLimits.characters} символов. Сохраните короткую версию для проверки.</p>}
         <p className="video-muted">Новый план собирается из целых предложений; длинные фрагменты делятся по словам. Это бесплатная заготовка, не ИИ-раскадровка. Опишите в каждом кадре конкретный объект, действие и место. Существующая сборка не меняется.</p>
         {jobs.length > 0 && <><label htmlFor="video-history">Сборки этой версии</label><select id="video-history" value={selected} disabled={!!busy} onChange={e => {
           if (dirty && !window.confirm('Описания не сохранены. Переключить сборку?')) return;

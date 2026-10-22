@@ -10,7 +10,7 @@ export type Asset = {
   provider?: ImageProviderId; requestedProvider?: ImageProviderId;
 };
 export type ClipTail = 'hold' | 'loop' | 'auto';
-export type VideoShot = { id: string; text: string; start: number; end: number; prompt: string; image: Asset; visual?: 'image' | 'clip'; clip?: { file: string; duration: number; source: 'upload'; tail: ClipTail } };
+export type VideoShot = { id: string; text: string; start: number; end: number; prompt: string; image: Asset; sourceSceneId?: string; visual?: 'image' | 'clip'; clip?: { file: string; duration: number; source: 'upload'; tail: ClipTail } };
 export const usesClip = (shot: VideoShot) => shot.visual === 'clip' && !!shot.clip?.file;
 export const hasVisual = (shot: VideoShot) => shot.visual === 'clip' ? !!shot.clip?.file : !!shot.image.file;
 export type VideoOperation = { kind: 'generate' | 'speech' | 'replace' | 'render' | 'check'; shotId?: string; budgetUSD: number; reservedUSD: number };
@@ -24,6 +24,9 @@ export type VideoJob = {
   visualStyle?: VisualStyle;
   subtitlesEnabled?: boolean;
   storyboardFrom?: { id: string; revision: number; target: number };
+  planSource?: 'script' | 'scenes';
+  versionScript?: string;
+  sceneSnapshot?: import('../scene-editing').SceneEdit[];
   output?: string; subtitles?: string; outputStale: boolean;
   operation?: VideoOperation;
   attempts: { id: string; kind: 'speech' | 'image'; shotId?: string; provider?: ImageProviderId; model?: string; estimatedUSD: number; at: string }[];
