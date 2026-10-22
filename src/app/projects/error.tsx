@@ -5,12 +5,13 @@ import Link from "next/link";
 
 export default function ProjectsError({ reset }: { reset: () => void }) {
   return (
-    <div className="auth-shell">
-      <section className="auth-card">
-        <h1 className="auth-title">Не удалось открыть пространство</h1>
-        <p className="auth-description">Не удалось получить данные из Supabase. Проверьте соединение и повторите загрузку. Сбой загрузки после сохранения не означает, что сохранение не состоялось.</p>
+    <div className="workspace-feedback">
+      <section role="alert">
+        <h1>Не получилось загрузить страницу</h1>
+        <p>Проверьте соединение и попробуйте ещё раз.</p>
+        <p className="video-muted">Если ошибка появилась после сохранения, сначала обновите страницу: изменения могли уже сохраниться.</p>
         <RetryPage reset={reset} />
-        <p><Link className="text-link" href="/">На главную</Link></p>
+        <p><Link className="text-link" href="/projects">К моим роликам</Link></p>
       </section>
     </div>
   );

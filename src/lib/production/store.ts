@@ -31,8 +31,8 @@ export async function withLock<T>(file: string, run: () => Promise<T>): Promise<
     let pid: number;
     try { pid = Number(await readFile(file, 'utf8')); } catch { throw new Error('Задача занята. Повторите действие позже.'); }
     // Never steal a live process lock, including another request in this process.
-    if (!Number.isSafeInteger(pid) || pid <= 0) throw new Error('Файл блокировки повреждён. Перезапустите приложение.');
-    try { process.kill(pid, 0); throw new Error('Задача занята. Повторите действие позже.'); }
+    if (!Number.isSafeInteger(pid) || pid <= 0) throw Object.assign(new Error('Файл блокировки повреждён. Перезапустите приложение.'), { code: 'WORKER_LOCK_INVALID' });
+    try { process.kill(pid, 0); throw Object.assign(new Error('Задача занята. Повторите действие позже.'), { code: 'WORKER_LOCK_BUSY' }); }
     catch (probe) { if ((probe as NodeJS.ErrnoException).code !== 'ESRCH') throw probe; }
     // Reclamation is serialized, so two contenders cannot remove a newly acquired lock.
     const reclaim = `${file}.reclaim`;

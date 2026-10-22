@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import Image from 'next/image';
+import { toast } from 'sonner';
 import { RunwayConnection } from './runway-connection';
 import { TimedStoryboard } from './timed-storyboard';
 import { FlowHandoff } from './flow-handoff';
@@ -46,14 +47,33 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
   const assetURL = (file: string, download = false) => `/projects/${projectId}/video/assets/${job!.id}/${file}?version=${versionId}${download ? '&download=1' : ''}`;
   const putJob = (value: VideoView) => { setJobs(old => [value, ...old.filter(j => j.id !== value.id)]); setSelected(value.id); };
   const refreshing = useRef(false);
+  const observedJobs = useRef(new Map(initialJobs.map(j => [j.id, j.status])));
+  const refreshProblem = useRef(false);
   const refresh = useCallback(async () => {
     if (refreshing.current) return;
     refreshing.current = true;
     try {
       const state = await videoState(projectId, versionId);
-      if (state.error) { setError(state.error); return; }
+      if (state.error) {
+        setError(state.error);
+        if (!refreshProblem.current) toast.error('Не удалось обновить состояние', { id: 'video-connection', description: 'Материалы остаются на экране. Проверим соединение снова.' });
+        refreshProblem.current = true; return;
+      }
+      if (refreshProblem.current) { toast.success('Соединение восстановлено', { id: 'video-connection' }); setError(''); refreshProblem.current = false; }
+      for (const updated of state.jobs!) {
+        const previous = observedJobs.current.get(updated.id);
+        if ((previous === 'queued' || previous === 'running') && updated.status !== 'queued' && updated.status !== 'running') {
+          if (updated.status === 'failed') toast.error('Задача остановлена', { id: `video-job-${updated.id}`, description: updated.message });
+          else toast.success(updated.status === 'ready' ? 'Видео собрано' : 'Материалы обновлены', { id: `video-job-${updated.id}`, description: updated.message });
+        }
+        observedJobs.current.set(updated.id, updated.status);
+      }
       setJobs(state.jobs!); setSetup(state.setup!);
-    } catch { setError('Не удалось обновить состояние. Проверьте соединение приложения с Supabase.'); }
+    } catch {
+      setError('Не удалось обновить состояние. Проверьте соединение.');
+      if (!refreshProblem.current) toast.error('Нет связи', { id: 'video-connection', description: 'Материалы остаются на экране. Проверим соединение снова.' });
+      refreshProblem.current = true;
+    }
     finally { refreshing.current = false; }
   }, [projectId, versionId]);
   const processing = job?.status === 'queued' || job?.status === 'running';
@@ -77,7 +97,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
     if (dirty && !window.confirm('Описания кадров не сохранены. Открыть новую сборку?')) return;
     startTransition(async () => {
       setError('');
-      try { const result = await newVideo(projectId, versionId, voice, provider, planSource); if (result.error) setError(result.error); else { putJob(result.job!); setDrafts({}); setDraftRevision(undefined); setStage('frames'); } }
+      try { const result = await newVideo(projectId, versionId, voice, provider, planSource); if (result.error) setError(result.error); else { putJob(result.job!); setDrafts({}); setDraftRevision(undefined); setStage('frames'); toast.success('План кадров создан'); } }
       catch { setError('Не удалось создать план. Попробуйте позже.'); }
     });
   }
@@ -96,7 +116,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
       setError('');
       try {
         const result = await saveVideoPrompts(projectId, versionId, job.id, draftRevision ?? job.revision, job.shots.map(s => ({ id: s.id, prompt: drafts[s.id] ?? s.prompt })));
-        if (result.error) setError(result.error); else { putJob(result.job!); setDrafts({}); setDraftRevision(undefined); }
+        if (result.error) setError(result.error); else { putJob(result.job!); setDrafts({}); setDraftRevision(undefined); toast.success('Описания сохранены'); }
       } catch { setError('Не удалось сохранить описания. Ваши правки остались на экране.'); }
     });
   }
@@ -129,7 +149,8 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
       setError('');
       try {
         const result = await startVideoOperation(projectId, versionId, job.id, job.revision, kind, Number(budget), confirmed, shotId);
-        if (result.error) setError(result.error); else { putJob(result.job!); setConfirmed(false); }
+        if (result.error) { setError(result.error); toast.error('Не удалось запустить задачу', { description: result.error }); }
+        else { putJob(result.job!); observedJobs.current.set(result.job!.id, result.job!.status); setConfirmed(false); toast.info('Задача поставлена в очередь'); }
       } catch { setError('Не удалось получить подтверждение запуска. Обновите состояние перед повторным действием.'); }
     });
   }
