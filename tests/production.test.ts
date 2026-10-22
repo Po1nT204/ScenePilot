@@ -1,3 +1,4 @@
+import { suggestedVideoStage, videoStageProgress } from '../src/lib/production/workflow';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
@@ -699,3 +700,24 @@ test('TTS rejections explain payment and quota without retries or raw error leak
     assert.ok(error instanceof ProviderError); assert.equal(error.uncertain,true); return true;
   });
 });
+
+
+test('workflow resumes from missing materials, supports clip-only jobs and stale exports', async () => sandbox(async root => {
+  assert.equal(suggestedVideoStage(), 'plan');
+  const job = await createJob(scope, input, root);
+  assert.equal(suggestedVideoStage(publicJob(job)), 'speech');
+  job.audio.file = 'audio.mp3';
+  assert.equal(suggestedVideoStage(publicJob(job)), 'frames');
+  for (const shot of job.shots) { shot.visual='clip'; shot.clip={file:'clip.mp4',duration:8,source:'upload',tail:'auto'}; }
+  assert.equal(suggestedVideoStage(publicJob(job)), 'motion');
+  const progress=videoStageProgress(publicJob(job));
+  assert.equal(progress.frames, `${job.shots.length} / ${job.shots.length}`);
+  assert.equal(progress.motion, `Клипов: ${job.shots.length}`);
+  job.output='result.mp4';job.outputStale=true;
+  assert.equal(suggestedVideoStage(publicJob(job)), 'result');
+  assert.equal(videoStageProgress(publicJob(job)).result,'Нужно пересобрать');
+  job.shots[0].visual='image';
+  assert.equal(suggestedVideoStage(publicJob(job)), 'frames');
+  job.operation={kind:'render',budgetUSD:0,reservedUSD:0};
+  assert.equal(suggestedVideoStage(publicJob(job)), 'result');
+}));
