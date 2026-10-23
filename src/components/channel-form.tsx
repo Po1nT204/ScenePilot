@@ -17,22 +17,25 @@ export function ChannelForm({ initial, id, revision }: { initial: ChannelProfile
     <input type="hidden" name="profileId" value={id ?? ""} />
     <input type="hidden" name="profileRevision" value={revision ?? ""} />
     <fieldset disabled={pending}>
+      <div className="profile-fields">
+      {(Object.keys(channelLimits) as (keyof typeof channelLimits)[]).map(field => <div key={field} className={field === 'name' || field === 'format' || field === 'avoid' ? 'form-wide' : undefined}>
+        <label htmlFor={`channel-${field}`}>{labels[field]}</label>
+        {field === 'name' ? <input id="channel-name" name="name" maxLength={channelLimits.name} defaultValue={state.values.name} required aria-invalid={!!state.errors?.name} aria-describedby="channel-name-hint channel-name-error" /> :
+        <textarea id={`channel-${field}`} name={field} rows={3} maxLength={channelLimits[field]} required={field !== "avoid"} {...(field === "format" ? { value: format, onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => { setFormat(e.target.value); setQualityMessage(""); } } : { defaultValue: state.values[field] })} aria-invalid={!!state.errors?.[field]} aria-describedby={`channel-${field}-hint channel-${field}-error`} />}
+        <p className="field-hint" id={`channel-${field}-hint`}>{hints[field]}</p>
+        <p className="field-error" id={`channel-${field}-error`}>{state.errors?.[field]}</p>
+      </div>)}
+      </div>
+      <label htmlFor="channel-language">Основной язык роликов</label>
+      <select id="channel-language" name="language" defaultValue={state.values.language} aria-describedby="channel-language-error"><option value="ru">Русский</option><option value="en">Английский</option></select>
+      <p className="field-error" id="channel-language-error">{state.errors?.language}</p>
       <ContentQualityBuilder onAppend={recipe => {
         const result = appendQualityRecipe(format, recipe, channelLimits.format);
         if (result.error) { setQualityMessage(result.error); return; }
         setFormat(result.value); setQualityMessage('Требования добавлены в формат. Проверьте текст и сохраните профиль.');
       }} />
       <p role="status">{qualityMessage}</p>
-      {(Object.keys(channelLimits) as (keyof typeof channelLimits)[]).map(field => <div key={field}>
-        <label htmlFor={`channel-${field}`}>{labels[field]}</label>
-        <textarea id={`channel-${field}`} name={field} rows={field === "topics" || field === "audience" ? 3 : 2} maxLength={channelLimits[field]} required={field !== "avoid"} {...(field === "format" ? { value: format, onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => { setFormat(e.target.value); setQualityMessage(""); } } : { defaultValue: state.values[field] })} aria-invalid={!!state.errors?.[field]} aria-describedby={`channel-${field}-hint channel-${field}-error`} />
-        <p className="field-hint" id={`channel-${field}-hint`}>{hints[field]}</p>
-        <p className="field-error" id={`channel-${field}-error`}>{state.errors?.[field]}</p>
-      </div>)}
-      <label htmlFor="channel-language">Основной язык роликов</label>
-      <select id="channel-language" name="language" defaultValue={state.values.language} aria-describedby="channel-language-error"><option value="ru">Русский</option><option value="en">Английский</option></select>
-      <p className="field-error" id="channel-language-error">{state.errors?.language}</p>
-      <button className="button" type="submit">{pending ? "Сохраняем…" : "Сохранить профиль"}</button>
+      <button className="button form-submit" type="submit">{pending ? "Сохраняем…" : "Сохранить профиль"}</button>
     </fieldset>
     <p className={state.saved ? "form-message success" : "form-message"} role="status">{state.message}</p>
   </form>;

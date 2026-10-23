@@ -20,8 +20,8 @@ export function NewProjectComposer({ profiles, initialId, yandexEnabled }: { pro
         <option value="">Без профиля</option>
         {profiles.map(p => <option key={p.id} value={p.id}>{p.name} · {p.language === 'ru' ? 'Русский' : 'Английский'}</option>)}
       </select>
-      <p className="field-hint">Требования выбранного профиля сохранятся в этом ролике. Последующие изменения профиля его не затронут.</p>
-      <Link className="text-link" href="/projects/channel" target="_blank" rel="noreferrer">Настроить профили в отдельной вкладке</Link>
+      <p className="field-hint">Профиль необязателен. Его требования сохранятся вместе с роликом.</p>
+      <Link className="text-link" href="/projects/channel" target="_blank" rel="noreferrer" aria-label="Настроить профили — в новой вкладке">Настроить профили ↗</Link>
     </div>
     {profile && <ChannelDetails value={profile} />}
     {profile && (!initial.genre || !initial.style) && <p className="field-hint">Подробные требования сохранятся целиком. Для жанра и стиля укажите короткие названия до 100 символов.</p>}

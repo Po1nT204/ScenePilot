@@ -225,7 +225,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
           <label className="video-consent"><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} disabled={!!busy} />Разрешаю указанные запросы к выбранному сервису, включая бесплатную квоту. Для платного API действует предел оценки; списание при ошибке возможно.</label>
     </details>;
   return <section className="video-studio" aria-label="Производство видео">
-    <div className="video-studio-heading"><div><p className="eyebrow">ОТ СЦЕНАРИЯ К РОЛИКУ</p><h2>Ваш ролик</h2><p>Сценарий, голос, кадры и движение — к готовому ролику.</p></div><span className="video-pill">MP4 · 720p · 16:9</span></div>
+    <div className="video-studio-heading"><h2>Видеостудия</h2><span className="video-pill">MP4 · 720p · 16:9</span></div>
     {error && <p className="video-alert" role="alert">{error}</p>}
     <div className="video-toolbar">
       <p>{job ? `${statusLabel[job.status]} · ${job.shots.filter(hasVisual).length}/${job.shots.length} кадров` : 'Начните с бесплатного плана кадров'} · {setup.workerOnline ? 'Обработчик работает' : 'Обработчик не запущен'}</p>

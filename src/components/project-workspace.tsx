@@ -12,12 +12,12 @@ export function ProjectWorkspace({ projectId, title, current, version }: {
   const base = `/projects/${projectId}`;
   const query = version ? `?version=${version.id}` : "";
   const sections: { id: Section; label: string; href: string; available: boolean }[] = [
-    { id: "settings", label: "Настройки", href: base + query, available: true },
     { id: "scripts", label: "Сценарий", href: `${base}/scripts${query}`, available: true },
     { id: "scenes", label: "Сцены", href: `${base}/scenes${query}`, available: !!version },
     { id: "video", label: "Видео", href: `${base}/video${query}`, available: !!version },
     { id: "publication", label: "Публикация", href: `${base}/publication${query}`, available: !!version },
-    { id: "export", label: "Экспорт", href: `${base}/export${query}`, available: !!version },
+    { id: "export", label: "Экспорт текстов", href: `${base}/export${query}`, available: !!version },
+    { id: "settings", label: "Настройки", href: base + query, available: true },
   ];
 
   return <header className="project-workspace">
@@ -28,13 +28,17 @@ export function ProjectWorkspace({ projectId, title, current, version }: {
     </div>
     <nav className="workspace-tabs" aria-label="Материалы ролика">
       {sections.map(section => section.available
-        ? <Link key={section.id} href={section.href} aria-current={current === section.id ? "page" : undefined}>{section.label}</Link>
-        : <span key={section.id} aria-disabled="true" title="Сначала сохраните сценарий">{section.label}</span>)}
+        ? <Link className={section.id === 'publication' ? 'workspace-utility-start' : undefined} key={section.id} href={section.href} aria-current={current === section.id ? "page" : undefined}>{section.label}</Link>
+        : <span className={section.id === 'publication' ? 'workspace-utility-start' : undefined} key={section.id} aria-disabled="true" title="Сначала сохраните сценарий">{section.label}</span>)}
     </nav>
     <p className="workspace-context">{!version
-      ? "Сохраните первый сценарий, чтобы открыть сцены, видео, материалы публикации и экспорт."
+      ? "Сохраните первый сценарий — затем можно перейти к озвучке и видео."
       : current === "settings"
         ? "Настройки общие для ролика. Их изменения попадут только в новые версии сценария."
-        : "Сцены, материалы публикации и экспорт относятся к указанной сохранённой версии. История версий доступна в разделе «Сценарий»."}</p>
+        : current === 'scripts' ? 'Напишите текст или используйте генерацию. Каждое сохранение создаёт отдельную версию.'
+        : current === 'scenes' ? 'Уточните сцены и визуальные промпты. Для видео можно использовать и сценарий без сцен.'
+        : current === 'video' ? 'Сценарий → озвучка → кадры → анимация по желанию → MP4.'
+        : current === 'publication' ? 'Подготовьте заголовок и описание для самостоятельной публикации на YouTube.'
+        : 'Скачайте сохранённые тексты и промпты. Готовый MP4 находится в разделе «Видео».'}</p>
   </header>;
 }

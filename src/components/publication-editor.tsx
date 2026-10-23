@@ -49,13 +49,13 @@ export function PublicationEditor({projectId,versionId,initial,yandexEnabled}: {
  }
  return <div className="publication-editor">
   <div className="scene-toolbar">
-   <button type="button" className="text-button" disabled={busy} onClick={() => run('test')}>Тестовый шаблон · бесплатно</button>
    <button type="button" className="text-button" disabled={busy || !yandexEnabled} onClick={() => run('yandex')}>Подготовить с YandexGPT · платно</button>
+   <details className="editor-extra-actions"><summary>Тестовый шаблон</summary><button type="button" className="text-button" disabled={busy} onClick={() => run('test')}>Заполнить тестовым шаблоном · бесплатно</button></details>
   </div>
-  <p className="field-hint">Можно заполнить заголовок и описание вручную. Варианты необязательны. Источник: {sourceLabel(draft.source)}; ручные правки сохраняют эту отметку.</p>
-  {!yandexEnabled && <p className="field-hint">Yandex выключен или не настроен. Ручной ввод и тестовый шаблон доступны.</p>}
+  <p className="field-hint">Можно написать текст вручную. Источник: {sourceLabel(draft.source)}.</p>
+  {!yandexEnabled && <p className="field-hint">YandexGPT не подключён. Можно заполнить поля самостоятельно.</p>}
   <p role="status">{message}</p>
-  <p>{dirty ? 'Есть несохранённые изменения' : initial || draft.title ? 'Нет несохранённых изменений' : 'Материалы ещё не сохранены'}</p>
+  <p className="editor-note">{dirty ? 'Есть несохранённые изменения' : initial || draft.title ? 'Нет несохранённых изменений' : 'Материалы ещё не сохранены'}</p>
   <form className="auth-form project-form" onSubmit={e => {e.preventDefault();void run('save');}}>
    <fieldset disabled={busy}>
     {!!draft.titles.length && <div className="publication-variants"><h3>Варианты заголовка</h3>{draft.titles.map((title,index) => <div key={index}>

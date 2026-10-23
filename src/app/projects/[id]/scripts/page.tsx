@@ -1,3 +1,4 @@
+import { WorkspaceNext } from "@/components/workspace-next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireProjectUser } from "@/lib/projects/server";
@@ -34,6 +35,7 @@ export default async function ScriptsPage({ params, searchParams }: { params: Pr
    {history.data.length ? <ul>{history.data.map(item => <li key={item.id}><Link href={`/projects/${id}/scripts?version=${item.id}`} aria-current={selectedId === item.id ? "page" : undefined}>Версия {item.version_number}{selectedId === item.id ? " — открыта" : ""}</Link><time dateTime={item.created_at}>{new Intl.DateTimeFormat("ru-RU", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Yekaterinburg" }).format(new Date(item.created_at))} UTC+5</time></li>)}</ul> : <p>Сохранённых версий пока нет.</p>}
   </details>
   <ScriptEditor key={version?.id ?? "new"} projectId={id} initial={version?.content ?? ""} versionNumber={version?.version_number} initialSource={version?.source ?? "manual"} yandexEnabled={yandexReady()} targetDuration={project.data.target_duration_seconds} versionDuration={snapshot?.target_duration_seconds} initialPace={snapshot?.narration_pace} />
+  {version && <WorkspaceNext href={`/projects/${id}/video?version=${version.id}`} title="К озвучке и видео">Сохранённый сценарий готов для следующего шага. Сцены можно уточнить отдельно.</WorkspaceNext>}
   {snapshot && <details className="editor-help"><summary>Настройки сохранённой версии {version?.version_number}</summary><p>{snapshot.title}: {snapshot.topic}</p><p>{snapshot.genre} · {snapshot.style} · {snapshot.language === "ru" ? "Русский" : "Английский"} · {snapshot.target_duration_seconds} сек.</p><ChannelDetails value={snapshot.channel} /></details>}
  </section></>;
 }

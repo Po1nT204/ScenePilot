@@ -16,14 +16,14 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
  if (requested !== undefined && requested !== "none" && !isProjectId(requested)) notFound();
  const { supabase, user } = await requireProjectUser();
  const result = await supabase.from("channel_profiles").select(channelColumns).eq("owner_id", user.id).order("name").order("id");
- if (result.error) return <section className="project-editor"><h1 className="auth-title">Новый ролик</h1><p role="alert">{channelSchemaError(result.error.code) ? channelMigrationMessage : "Не удалось получить профили из Supabase. Проверьте соединение и нажмите «Повторить загрузку»."}</p><RetryPage /><p><Link href="/projects" className="text-link">Мои ролики</Link></p></section>;
+ if (result.error) return <section className="project-editor"><h1 className="auth-title">Новый ролик</h1><p role="alert">{channelSchemaError(result.error.code) ? channelMigrationMessage : "Не удалось загрузить профили. Проверьте соединение и повторите загрузку."}</p><RetryPage /><p><Link href="/projects" className="text-link">Мои ролики</Link></p></section>;
  const profiles: SavedChannelProfile[] = (result.data ?? []).flatMap(row => {
   const profile = channelSnapshot(row);
   return profile ? [{ ...profile, id: row.id, updated_at: row.updated_at }] : [];
  });
  if (requested && requested !== "none" && !profiles.some(p => p.id === requested)) notFound();
  const initialId = requested === "none" ? "" : requested ?? (profiles.length === 1 ? profiles[0].id : "");
- return <section className="project-editor"><h1 className="auth-title">Новый ролик</h1><p className="auth-description">Выберите профиль и замысел или заполните настройки самостоятельно. Сценарий создаётся после сохранения ролика.</p>
+ return <section className="project-editor new-project-page"><Link href="/projects" className="text-link">← Мои ролики</Link><p className="eyebrow">НОВАЯ ИСТОРИЯ</p><h1 className="auth-title">О чём будет ролик?</h1><p className="auth-description">Задайте тему и формат. Следом — сценарий, озвучка и видео.</p>
   <NewProjectComposer profiles={profiles} initialId={initialId} yandexEnabled={yandexReady()} />
  </section>;
 }

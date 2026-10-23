@@ -118,10 +118,13 @@ export function SceneEditor({projectId,versionId,initial,yandexEnabled,scriptCon
   <div className="scene-toolbar editor-actions" aria-label="Действия со сценами">
    <button className="button" form={formId} type="submit" disabled={busy || !dirty || !valid}>{busy ? "Выполняем запрос…" : "Сохранить сцены"}</button>
    <button type="button" id="add-scene" className="text-button" disabled={busy || scenes.length >= 12} onClick={add}>Добавить сцену</button>
-   <button type="button" className="text-button" disabled={busy || hasShots} onClick={() => run("test")}>Тестовые сцены · бесплатно</button>
    <button type="button" className="text-button" disabled={busy || hasShots || !yandexEnabled || !supportsFullGeneration(targetDuration)} onClick={() => run("yandex")}>Сцены YandexGPT · платно</button>
   </div>
-  <div className="editor-actions"><button type="button" className="text-button" onClick={() => void verifySaved()} disabled={busy}>Проверить сохранение · без записи</button><button type="button" className="text-button" onClick={downloadDraft} disabled={busy || !scenes.length}>Скачать черновик сцен</button></div>
+  <details className="editor-help"><summary>Черновик и дополнительные действия</summary><div className="scene-toolbar">
+   <button type="button" className="text-button" disabled={busy || hasShots} onClick={() => run("test")}>Тестовые сцены · бесплатно</button>
+   <button type="button" className="text-button" onClick={() => void verifySaved()} disabled={busy}>Проверить сохранение · без записи</button>
+   <button type="button" className="text-button" onClick={downloadDraft} disabled={busy || !scenes.length}>Скачать черновик сцен</button>
+  </div></details>
   <SceneImport disabled={busy || hasShots} onImport={importScenes} />
   {!yandexEnabled && <p className="editor-note">YandexGPT выключен или не настроен.</p>}
   {hasShots && <p className="editor-note">У эпизодов есть кадры. Генерация замены отключена; ручные правки и порядок доступны.</p>}

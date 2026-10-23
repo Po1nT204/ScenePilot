@@ -71,8 +71,10 @@ export function ScriptEditor({ projectId, initial, versionNumber, initialSource,
   <div className="editor-actions" aria-label="Действия со сценарием">
    <button className="button" type="submit" disabled={busy || !!state.savedId || !paceValid || !content.trim()}>{pending ? "Сохраняем…" : "Сохранить новую версию"}</button>
    <button className="text-button" type="button" onClick={() => generate("yandex")} disabled={!yandexEnabled || !options || !paceValid || busy || !!state.savedId}>YandexGPT · платно</button>
-   <button className="text-button" type="button" onClick={() => generate("yandex",true)} disabled={!yandexEnabled || !content.trim() || !options || !paceValid || busy || !!state.savedId}>Доработать объём · платно</button>
-   <button className="text-button" type="button" onClick={() => generate("test")} disabled={!paceValid || busy || !!state.savedId}>Тестовый пример · бесплатно</button>
+   <details className="editor-extra-actions"><summary>Ещё</summary><div>
+    <button className="text-button" type="button" onClick={() => generate("yandex",true)} disabled={!yandexEnabled || !content.trim() || !options || !paceValid || busy || !!state.savedId}>Доработать объём · платно</button>
+    <button className="text-button" type="button" onClick={() => generate("test")} disabled={!paceValid || busy || !!state.savedId}>Тестовый пример · бесплатно</button>
+   </div></details>
   </div>
   {!yandexEnabled && <p className="editor-note">YandexGPT выключен или не настроен.</p>}
   {target && <p className="editor-note">Ориентир генерации: {target.words} слов ({target.minWords}–{target.maxWords}) · {target.pace} слов/мин{targetDuration>300 ? ' · Для длинного текста нужна YandexGPT 5.1' : ''}</p>}

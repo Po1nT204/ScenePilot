@@ -30,9 +30,9 @@ export default async function ExportPage({params,searchParams}:{params:Promise<{
  const snapshot=saved.settings_snapshot as ExportSnapshot;
  return <><ProjectWorkspace projectId={id} title={project.data.title} current="export" version={saved} />
  <section className="project-editor">
-  <h2>Экспорт материалов</h2>
+  <h2>Тексты и промпты</h2>
   {snapshot.title !== project.data.title && <p>Название в сохранённой версии: {snapshot.title}</p>}
-  <p>Только сохранённые данные. Правки из редакторов не включены; после изменений в другой вкладке обновите страницу. Полные сведения об источниках — в архиве.</p>
+  <p className="editor-note">В файл попадут только сохранённые данные этой версии. После правок в другой вкладке обновите страницу.</p>
   <ExportPanel key={saved.id} document={{versionId:saved.id,versionNumber:saved.version_number,createdAt:saved.created_at,content:saved.content,source:saved.source,snapshot,scenes:scenes.data,shots:shots.data,shotPlans:plans.data,publication:material ? {...material,script_version_id:versionId} : null}} />
  </section></>;
 }

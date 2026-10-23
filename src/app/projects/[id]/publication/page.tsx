@@ -23,8 +23,7 @@ export default async function PublicationPage({params,searchParams}: {params:Pro
  return <><ProjectWorkspace projectId={id} title={project.data.title} current="publication" version={version.data} />
   <section className="project-editor">
    <h2>Заголовок и описание</h2>
-   <p>Материалы для версии {version.data.version_number}. Здесь вы готовите текст для переноса на YouTube самостоятельно.</p>
-   <p>Источник сценария: {sourceLabel(version.data.source)}. Проверьте факты и соответствие описания содержанию ролика.</p>
+   <p className="editor-note">Источник сценария: {sourceLabel(version.data.source)}. Проверьте факты и соответствие описания содержанию ролика.</p>
    <details><summary>Сценарий, по которому готовятся материалы</summary><p className="project-full-topic">{version.data.content}</p></details>
    {error ? <p role="alert">{error}</p> : <PublicationEditor key={versionId} projectId={id} versionId={versionId} initial={initial} yandexEnabled={yandexReady()} />}
   </section>

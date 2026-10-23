@@ -1,3 +1,4 @@
+import { LibraryCard } from "@/components/library-card";
 import { RetryPage } from "@/components/retry-page";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -34,7 +35,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   return <section className="video-library" aria-labelledby="library-title">
     <div className="project-heading">
       <div><p className="eyebrow">БИБЛИОТЕКА</p><h1 id="library-title" className="auth-title">Мои ролики</h1>
-        <p className="auth-description">Сценарии, сцены, тексты публикации и экспорт — открывайте нужный материал сразу.</p></div>
+        <p className="auth-description">Продолжите работу над историей или начните новую.</p></div>
       {!error && <Link className="button" href="/projects/new">+ Новый ролик</Link>}
     </div>
     {query.deleted === "1" && <p className="success-notice" role="status">Проект и его облачные материалы удалены. Локальные файлы видео остаются на компьютере.</p>}
@@ -48,34 +49,8 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
         <h2>Добавьте первый ролик</h2><p>Задайте тему и параметры. Затем напишите сценарий или создайте его с помощью YandexGPT.</p>
         <Link className="button" href="/projects/new">Создать ролик</Link></section>
         : <>
-          <p className="library-note">Показаны ролики {offset + 1}–{offset + projects.length}{search ? ` по запросу «${search}»` : ''}. Сначала — недавно изменённые. В карточке — последняя сохранённая версия сценария.</p>
-          <div className="video-list">{projects.map(project => {
-            const base = `/projects/${project.id}`;
-            const version = project.script_versions[0];
-            const sceneCount = version?.scenes[0]?.count ?? 0;
-            const scriptUrl = version ? `${base}/scripts?version=${version.id}` : `${base}/scripts`;
-            return <article className="video-row" key={project.id}>
-              <div className="video-summary">
-                <p className="video-meta">{project.language === "ru" ? "Русский" : "Английский"} · {project.target_duration_seconds} сек. · {project.genre}</p>
-                <h2><Link href={scriptUrl}>{project.title}</Link></h2>
-                <p className="project-topic">{project.topic}</p>
-                <Link className="text-link video-settings" href={base}>Настройки ролика</Link>
-                <Link className="text-link library-delete-link" href={`${base}#delete-project`} aria-label={`Перейти к удалению ролика «${project.title}»`}>Удаление…</Link>
-              </div>
-              <div className="video-materials">
-                <p className="material-status">{version ? <>Версия {version.version_number}<span>Сохранённых сцен: {sceneCount}</span></> : <>Сценария пока нет<span>Начните с текста или генерации</span></>}</p>
-                <div className="material-links" role="group" aria-label={`Материалы ролика «${project.title}»`}>
-                  <Link className="button" href={scriptUrl}>{version ? "Сценарий" : "Создать сценарий"}</Link>
-                  {version ? <>
-                    <Link className="text-button" href={`${base}/scenes?version=${version.id}`}>{sceneCount ? "Сцены" : "Создать сцены"}</Link>
-                    <Link className="text-button" href={`${base}/video?version=${version.id}`}>Видео</Link>
-                    <Link className="text-button" href={`${base}/publication?version=${version.id}`}>Публикация</Link>
-                    <Link className="text-button" href={`${base}/export?version=${version.id}`}>Экспорт</Link>
-                  </> : <p className="material-hint">Сцены, тексты публикации и экспорт станут доступны после сохранения сценария.</p>}
-                </div>
-              </div>
-            </article>;
-          })}</div>
+          <p className="library-note">Ролики {offset + 1}–{offset + projects.length}{search ? ` · «${search}»` : ''} · Сначала недавно изменённые</p>
+          <div className="video-list">{projects.map(project => <LibraryCard key={project.id} project={project} />)}</div>
           <LibraryPagination page={page} search={search} hasNext={hasNext} />
         </>}
   </section>;

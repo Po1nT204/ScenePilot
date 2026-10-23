@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./workspace.css";
 import { Notifications } from '@/components/notifications';
 
 export const metadata: Metadata = {

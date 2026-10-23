@@ -1,3 +1,5 @@
+import { WorkspaceNext } from "@/components/workspace-next";
+import { formatDuration } from "@/lib/narration";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DeleteProjectForm } from "@/components/delete-project-form";
@@ -39,8 +41,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   {query.saved === "1" && query.edit !== "1" && <p className="success-notice" role="status">Изменения сохранены.</p>}
   {query.edit === "1" ? <ProjectForm id={id} navigationVersion={version?.id} initial={{ title: project.title, topic: project.topic, genre: project.genre, style: project.style, language: project.language, duration: String(project.target_duration_seconds) }} /> : <>
    <p className="project-full-topic">{project.topic}</p>
-   <dl className="project-facts"><div><dt>Жанр</dt><dd>{project.genre}</dd></div><div><dt>Стиль</dt><dd>{project.style}</dd></div><div><dt>Язык</dt><dd>{project.language === "ru" ? "Русский" : "Английский"}</dd></div><div><dt>Длительность</dt><dd>{project.target_duration_seconds} сек.</dd></div></dl>
-   <Link className="button" href={"/projects/" + id + "?edit=1" + versionSuffix}>Изменить настройки</Link>
+   <dl className="project-facts"><div><dt>Жанр</dt><dd>{project.genre}</dd></div><div><dt>Стиль</dt><dd>{project.style}</dd></div><div><dt>Язык</dt><dd>{project.language === "ru" ? "Русский" : "Английский"}</dd></div><div><dt>Длительность</dt><dd>{formatDuration(project.target_duration_seconds)}</dd></div></dl>
+   <Link className="button secondary" href={"/projects/" + id + "?edit=1" + versionSuffix}>Изменить настройки</Link>
+   <WorkspaceNext href={`/projects/${id}/scripts${version ? `?version=${version.id}` : ""}`} title={version ? "Открыть сценарий" : "Написать сценарий"}>{version ? "Продолжите историю в выбранной версии." : "Замысел сохранён. Теперь можно написать текст или создать его с помощью ИИ."}</WorkspaceNext>
    <DeleteProjectForm id={id} title={project.title} />
   </>}
  </section></>;

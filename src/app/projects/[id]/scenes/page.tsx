@@ -1,3 +1,4 @@
+import { WorkspaceNext } from "@/components/workspace-next";
 import { ProjectWorkspace } from "@/components/project-workspace";
 import { notFound } from "next/navigation";
 import { requireProjectUser } from "@/lib/projects/server";
@@ -24,6 +25,7 @@ export default async function ScenesPage({params,searchParams}: {params:Promise<
  <section className="scene-page">
   <details className="editor-help"><summary>Исходный сценарий версии {version.data.version_number}</summary><p className="project-full-topic">{version.data.content}</p></details>
   {initial === null ? <div><p role="alert">{result.error && ["PGRST205","42P01"].includes(result.error.code) ? "Выполните миграции сцен по docs/setup.md в Supabase SQL Editor." : "Не удалось загрузить сцены. Обновите страницу позже."}</p><RetryPage /></div> : <SceneEditor key={versionId} projectId={id} versionId={versionId} initial={initial} yandexEnabled={yandexReady()} scriptContent={version.data.content} targetDuration={version.data.settings_snapshot.target_duration_seconds} initialPace={version.data.settings_snapshot.narration_pace} />}
+ {initial !== null && <WorkspaceNext href={`/projects/${id}/video?version=${versionId}`} title="К озвучке и видео">После сохранения выберите эти сцены при создании видеоплана.</WorkspaceNext>}
  {counts.error && <p role="alert">Кадры не загружены. Проверьте миграцию 202610160002_scene_shots.sql и соединение; удаление сцены с кадрами дополнительно защищено в базе.</p>}
  </section></>;
 }
