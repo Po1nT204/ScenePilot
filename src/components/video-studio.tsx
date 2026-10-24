@@ -6,6 +6,8 @@ import { videoStages, suggestedVideoStage, videoStageProgress, type VideoStage }
 import { RunwayConnection } from './runway-connection';
 import { TimedStoryboard } from './timed-storyboard';
 import { FlowHandoff } from './flow-handoff';
+import { FlowBatch } from './flow-batch';
+import { clipFileProblem, uploadVideoClip } from '@/lib/production/flow-batch';
 import { type VideoView, type VideoSetup, type VideoOperation, type SpeechConnection, hasVisual, usesClip, estimatedCost, requiredProviders, createsMaterials, createsImages, neededImageProviders, productionRates, productionLimits, normalizeNarration } from '@/lib/production/model';
 import { newVideo, saveVideoPrompts, startVideoOperation, videoState, checkVideoSpeechConnection, checkVideoImageConnection, saveVideoImageProvider, saveVideoAppearance, saveVideoVisual, fitVideoClips } from '@/app/projects/[id]/video/actions';
 import { visualStyles, imagePrompt, type VisualStyle } from '@/lib/production/visual-style';
@@ -23,6 +25,9 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
   const [setup, setSetup] = useState(initialSetup), [voice, setVoice] = useState(defaultVoice);
   const [stage, setStage] = useState<VideoStage>(() => suggestedVideoStage(initialJobs[0]));
   const [storyboardBusy, setStoryboardBusy] = useState(false);
+  const [transferBusy, setTransferBusy] = useState(false);
+  const transferBusyRef = useRef(false), refreshEpoch = useRef(0);
+  const markTransferBusy = (value: boolean) => { transferBusyRef.current = value; refreshEpoch.current++; setTransferBusy(value); };
   const [planSource, setPlanSource] = useState<'script' | 'scenes'>('script');
   const [showConnections, setShowConnections] = useState(false);
   const [error, setError] = useState(''), [pending, startTransition] = useTransition();
@@ -37,11 +42,11 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
   const imageConfigured = (id: ImageProviderId) => setup.imageProviders?.[id] ?? (id === 'bfl-flux11' && setup.images);
   const checkedImage = imageConnection?.provider === provider ? imageConnection : undefined;
   const dirty = Object.keys(drafts).length > 0;
-  const busy = storyboardBusy || pending || job?.status === 'queued' || job?.status === 'running';
+  const busy = transferBusy || storyboardBusy || pending || job?.status === 'queued' || job?.status === 'running';
   const cost = job ? stage === 'speech' ? estimatedCost(job, 'speech') : Math.max(0, estimatedCost(job, 'generate') - estimatedCost(job, 'speech')) : 0;
   const progress = videoStageProgress(job);
   const visualsReady = !!job && job.shots.every(hasVisual);
-  const goTo = (next: VideoStage) => { setStage(next); setConfirmed(false); };
+  const goTo = (next: VideoStage) => { if (transferBusyRef.current) return; setStage(next); setConfirmed(false); };
   const needs = job ? requiredProviders(job, 'generate') : { speech: true, images: true };
   const canGenerate = setup.enabled && (!needs.speech || setup.speech) && (!needs.images || (job && (!createsImages(job, 'generate') || provider !== 'none') && neededImageProviders(job, 'generate').every(imageConfigured))) && setup.workerOnline;
   const canSpeak = setup.enabled && setup.speech && setup.workerOnline;
@@ -49,19 +54,21 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
   const checkVoice = job?.voiceId || voice.trim();
   const checkedConnection = connection?.voiceId === checkVoice ? connection : undefined;
   const assetURL = (file: string, download = false) => `/projects/${projectId}/video/assets/${job!.id}/${file}?version=${versionId}${download ? '&download=1' : ''}`;
-  const putJob = (value: VideoView) => { setJobs(old => [value, ...old.filter(j => j.id !== value.id)]); setSelected(value.id); };
+  const putJob = (value: VideoView) => { refreshEpoch.current++; setJobs(old => [value, ...old.filter(j => j.id !== value.id)]); setSelected(value.id); };
   const refreshing = useRef(false);
   const observedJobs = useRef(new Map(initialJobs.map(j => [j.id, j.status])));
   const refreshProblem = useRef(false);
   const refresh = useCallback(async () => {
-    if (refreshing.current) return;
+    if (refreshing.current || transferBusyRef.current) return false;
     refreshing.current = true;
+    const epoch = refreshEpoch.current;
     try {
       const state = await videoState(projectId, versionId);
+      if (epoch !== refreshEpoch.current || transferBusyRef.current) return false;
       if (state.error) {
         setError(state.error);
         if (!refreshProblem.current) toast.error('Не удалось обновить состояние', { id: 'video-connection', description: 'Материалы остаются на экране. Проверим соединение снова.' });
-        refreshProblem.current = true; return;
+        refreshProblem.current = true; return false;
       }
       if (refreshProblem.current) { toast.success('Соединение восстановлено', { id: 'video-connection' }); setError(''); refreshProblem.current = false; }
       for (const updated of state.jobs!) {
@@ -73,16 +80,19 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
         observedJobs.current.set(updated.id, updated.status);
       }
       setJobs(state.jobs!); setSetup(state.setup!);
+      return true;
     } catch {
+      if (epoch !== refreshEpoch.current || transferBusyRef.current) return false;
       setError('Не удалось обновить состояние. Проверьте соединение.');
       if (!refreshProblem.current) toast.error('Нет связи', { id: 'video-connection', description: 'Материалы остаются на экране. Проверим соединение снова.' });
       refreshProblem.current = true;
+      return false;
     }
     finally { refreshing.current = false; }
   }, [projectId, versionId]);
   const processing = job?.status === 'queued' || job?.status === 'running';
   useEffect(() => {
-    if (pending || dirty) return;
+    if (pending || dirty || transferBusy) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
@@ -91,7 +101,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
     };
     timer = setTimeout(() => void poll(), processing ? 4000 : 30000);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [refresh, processing, pending, dirty]);
+  }, [refresh, processing, pending, dirty, transferBusy]);
   useEffect(() => {
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
@@ -171,18 +181,13 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
   }
   function uploadClip(shotId: string, file?: File) {
     if (!job || !file || busy || dirty) return;
-    if (file.size > 32 * 1024 * 1024) { setError('Выберите MP4 не больше 32 МиБ.'); return; }
+    const problem = clipFileProblem(file);
+    if (problem) { setError(problem); return; }
     startTransition(async () => {
       setError('');
       try {
-        const query = new URLSearchParams({ version: versionId, revision: String(job.revision), shot: shotId });
-        const response = await fetch(`/projects/${projectId}/video/clips/${job.id}?${query}`, { method: 'POST', headers: { 'Content-Type': 'video/mp4' }, body: file });
-        if (!response.headers.get('content-type')?.includes('application/json')) {
-          setError('Сервер не подтвердил загрузку. Обновите страницу и проверьте вход в ScenePilot; файл не отправлен на генерацию.'); return;
-        }
-        const result = await response.json();
-        if (result.error) setError(result.error); else if (result.job) putJob(result.job); else setError('Не удалось загрузить клип. Обновите состояние.');
-      } catch { setError('Не удалось подтвердить загрузку. Обновите состояние перед повтором.'); }
+        putJob(await uploadVideoClip(projectId, versionId, job, shotId, file)); toast.success('Клип добавлен');
+      } catch (error) { setError(error instanceof Error ? error.message : 'Не удалось подтвердить загрузку. Обновите состояние перед повтором.'); }
     });
   }
   function fitClips() {
@@ -263,7 +268,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
     <RunwayConnection projectId={projectId} versionId={versionId} disabled={!!busy || dirty} />
     </div>
     <nav className="video-steps" aria-label="Этапы сборки">
-      {videoStages.map(([id, number, label]) => <button key={id} type="button" disabled={!job && id !== 'plan'} aria-current={stage === id ? 'step' : undefined} aria-controls={`video-stage-${id}`} onClick={() => goTo(id)}><span>{number}</span><div>{label}<small>{progress[id]}</small></div></button>)}
+      {videoStages.map(([id, number, label]) => <button key={id} type="button" disabled={transferBusy || (!job && id !== 'plan')} aria-current={stage === id ? 'step' : undefined} aria-controls={`video-stage-${id}`} onClick={() => goTo(id)}><span>{number}</span><div>{label}<small>{progress[id]}</small></div></button>)}
     </nav>
     {jobs.length > 0 && <details className="video-history"><summary>Сборки этой версии · {jobs.length}</summary>
         {jobs.length > 0 && <><label htmlFor="video-history">Сборки этой версии</label><select id="video-history" value={selected} disabled={!!busy} onChange={e => {
@@ -336,7 +341,8 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
         <p>Этот этап можно пропустить: изображения получат плавное движение при монтаже. Для анимации персонажей создайте клипы в Flow и добавьте их к кадрам.</p>
         <p className="video-muted">Flow пока используется вручную и расходует квоту Google. Автоподгонка длительности не создаёт новых действий персонажа.</p>
         {job && <>
-          <div className="video-step-actions"><button type="button" className="video-text-button" onClick={() => goTo('frames')}>← Кадры</button><button type="button" className="button" disabled={!job.audio.file || !visualsReady || dirty} onClick={() => goTo('result')}>{job.shots.some(usesClip) ? 'К сборке →' : 'Продолжить без клипов →'}</button></div>
+          <FlowBatch key={job.id} job={job} projectId={projectId} versionId={versionId} disabled={!!busy || dirty} onBusy={markTransferBusy} onJob={putJob} onRefresh={refresh} />
+          <div className="video-step-actions"><button type="button" className="video-text-button" disabled={transferBusy} onClick={() => goTo('frames')}>← Кадры</button><button type="button" className="button" disabled={transferBusy || !job.audio.file || !visualsReady || dirty} onClick={() => goTo('result')}>{job.shots.some(usesClip) ? 'К сборке →' : 'Продолжить без клипов →'}</button></div>
           {(!job.audio.file || !visualsReady) && <p className="video-muted">Для сборки нужны озвучка и изображение или клип в каждом кадре.</p>}
           {job.shots.some(shot => shot.clip) && <button type="button" className="video-text-button" disabled={!!busy || dirty} onClick={fitClips}>Автоподгонка всех клипов под озвучку</button>}
           <ol className="video-shot-list">{job.shots.map((shot, index) => <li className="video-shot" key={shot.id}>

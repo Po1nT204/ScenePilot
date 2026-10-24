@@ -1,4 +1,33 @@
 /* Shared workspace skin. Landing styles and production state remain independent. */
+.flow-batch { border: 1px solid var(--line); border-radius: 12px; padding: 24px; margin-block: 24px; background: #fffefa; }
+.flow-batch-heading { display: flex; justify-content: space-between; flex-wrap: wrap; align-items: center; gap: 12px; }
+.flow-batch h4 { margin: 0; font-size: 20px; line-height: 1.4; }
+.flow-batch-export { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px; margin-block: 20px 12px; }
+.flow-batch-export > div { flex: 1 1 230px; }
+.flow-batch label { display: block; margin-bottom: 8px; font-size: 14px; }
+.flow-batch :is(select, input[type=file]) { display: block; width: 100%; min-width: 0; min-height: 44px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); font: inherit; }
+.flow-batch-guide { margin-block: 16px 24px; font-size: 13px; line-height: 1.7; }
+.flow-batch-guide summary, .batch-file-info summary { cursor: pointer; color: var(--green); padding-block: 8px; }
+.flow-batch-guide li + li { margin-top: 8px; }
+.flow-batch-import { border-top: 1px solid var(--line); padding-top: 22px; }
+.batch-file-list { list-style: none; padding: 0; margin: 20px 0; max-height: 600px; overflow: auto; }
+.batch-file-row { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr) auto; align-items: start; gap: 16px; padding: 20px 4px; border-bottom: 1px solid var(--line); }
+.batch-file-info { font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
+.batch-file-info small { display: block; margin-block: 8px; color: var(--muted); }
+.batch-file-target { min-width: 0; }
+.batch-target-preview { display: flex; align-items: flex-start; gap: 12px; margin-top: 12px; }
+.batch-target-preview img { border-radius: 6px; object-fit: contain; background: #e9ede2; }
+.batch-target-preview p { margin: 0; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.batch-clip-preview { display: block; width: 100%; max-height: 200px; background: #202822; border-radius: 6px; }
+.flow-batch .batch-replace { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.6; margin-block: 20px; }
+.batch-replace input { margin-top: 4px; flex-shrink: 0; }
+@media (max-width: 760px) {
+  .flow-batch { padding: 16px; }
+  .flow-batch-export > .button { width: 100%; }
+  .batch-file-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .batch-file-row > button { justify-self: start; }
+  .batch-target-preview { flex-wrap: wrap; }
+}
 .app-shell { min-height: 100vh; display: flex; flex-direction: column; background: radial-gradient(ellipse at 95% 0, #e6eadc88, transparent 45%), var(--paper); }
 .app-header { background: #f6f5f0f2; border-bottom: 1px solid var(--line); }
 .app-header-inner { min-height: 88px; display: flex; align-items: center; gap: 32px; }
