@@ -7,12 +7,14 @@ import { RunwayConnection } from './runway-connection';
 import { TimedStoryboard } from './timed-storyboard';
 import { FlowHandoff } from './flow-handoff';
 import { FlowBatch } from './flow-batch';
+import { FrameImageImport } from './frame-image-import';
+import { framePromptForFlow } from '@/lib/production/frame-transfer';
 import { clipFileProblem, uploadVideoClip } from '@/lib/production/flow-batch';
 import { type VideoView, type VideoSetup, type VideoOperation, type SpeechConnection, hasVisual, usesClip, estimatedCost, requiredProviders, createsMaterials, createsImages, neededImageProviders, productionRates, productionLimits, normalizeNarration } from '@/lib/production/model';
 import { newVideo, saveVideoPrompts, startVideoOperation, videoState, checkVideoSpeechConnection, checkVideoImageConnection, saveVideoImageProvider, saveVideoAppearance, saveVideoVisual, fitVideoClips } from '@/app/projects/[id]/video/actions';
 import { visualStyles, imagePrompt, type VisualStyle } from '@/lib/production/visual-style';
 
-import { imageCatalog, selectedImageProvider, imagePrice, type ImageProviderId, type ImageSelection } from '@/lib/production/image-catalog';
+import { imageCatalog, imageBillingLabel, selectedImageProvider, imagePrice, type ImageProviderId, type ImageSelection } from '@/lib/production/image-catalog';
 import { clipFit, videoFps } from '@/lib/production/clip-timing';
 import type { ImageAccess } from '@/lib/production/image-adapter';
 
@@ -250,7 +252,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
       <label htmlFor="video-image-provider">Модуль изображений</label>
       <select id="video-image-provider" value={provider} disabled={!!busy || dirty} onChange={e => changeImageProvider(e.target.value as ImageSelection)}>
         <option value="none">Выберите сервис — без автоматического выбора</option>
-        {Object.entries(imageCatalog).map(([id, info]) => <option key={id} value={id}>{info.label}{info.estimatedUSD === 0 ? ' · бесплатная Beta' : ' · платный API'}</option>)}
+        {Object.entries(imageCatalog).map(([id, info]) => <option key={id} value={id}>{info.label} · {imageBillingLabel(id as ImageProviderId)}</option>)}
       </select>
       <p className="video-muted">Выбор меняет только будущие запросы. Озвучка и готовые кадры сохраняются. Незавершённые задачи проверяются у исходного сервиса. Для Runway ниже есть отдельное подключение аккаунта подписки. Автоматическая видеоанимация пока не включена.</p>
       {providerInfo && <><p>{providerInfo.terms} <a href={providerInfo.url} target="_blank" rel="noreferrer">Условия сервиса</a></p>
@@ -313,7 +315,8 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
         {job && <>
           <p>Готово материалов: {job.shots.filter(hasVisual).length} из {job.shots.length}. Проверьте описания перед генерацией.</p>
           <label htmlFor="video-frames-provider">Сервис изображений</label>
-          <select id="video-frames-provider" value={provider} disabled={!!busy || dirty} onChange={e => changeImageProvider(e.target.value as ImageSelection)}><option value="none">Выберите сервис</option>{Object.entries(imageCatalog).map(([id, info]) => <option key={id} value={id}>{info.label}{info.estimatedUSD === 0 ? ' · бесплатная Beta' : ' · платный API'}</option>)}</select>
+          <select id="video-frames-provider" value={provider} disabled={!!busy || dirty} onChange={e => changeImageProvider(e.target.value as ImageSelection)}><option value="none">Без API · загрузка готовых кадров</option>{Object.entries(imageCatalog).map(([id, info]) => <option key={id} value={id}>{info.label} · {imageBillingLabel(id as ImageProviderId)}</option>)}</select>
+          {provider === 'cloudflare-flux2-klein9b' && <p className="video-muted">Подойдут уже настроенные ключи Cloudflare. {imageCatalog[provider].terms} Сначала сравните один кадр с SDXL; автоматического перехода на другую модель нет.</p>}
           <label htmlFor="video-visual-style">Общий стиль</label>
           <select id="video-visual-style" value={job.visualStyle ?? 'original'} disabled={!!busy || dirty} onChange={e => changeAppearance(e.target.value as VisualStyle, job.subtitlesEnabled ?? true)}>{Object.entries(visualStyles).map(([id, style]) => <option key={id} value={id}>{style.label}</option>)}</select>
           <p className="video-muted">Стиль применяется к новым изображениям. Готовые материалы сохраняются; одинаковые лица не гарантируются.</p>
@@ -321,16 +324,18 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
           {generationConsent}
           {needs.images && <button type="button" className="button" disabled={!!busy || dirty || !job.audio.file || !canGenerate || (createsMaterials(job, 'generate') && !confirmed)} onClick={() => operate('generate')}>Создать недостающие изображения · ≈ {usd(cost)}</button>}
           {needs.images && <p className="video-muted">Сохранённый голос и готовые изображения используются повторно. Для пробы можно создать один кадр ниже.</p>}
-          {provider === 'none' && <p className="video-muted">Выберите сервис выше или добавьте готовые MP4 на этапе «Анимация».</p>}
+          {provider === 'none' && <p className="video-muted">Добавьте изображения из Flow ниже или выберите сервис для генерации по API.</p>}
           {job.shots.some(s => s.image.state === 'pending') && <button type="button" className="button secondary" disabled={!!busy || dirty || !setup.workerOnline || !neededImageProviders(job, 'check').every(imageConfigured)} onClick={() => operate('check')}>Проверить задачи изображений · без новой генерации</button>}
           <div className="video-step-actions"><button type="button" className="video-text-button" onClick={() => goTo('speech')}>← Озвучка</button><button type="button" className={visualsReady ? 'button' : 'button secondary'} onClick={() => goTo('motion')}>{visualsReady ? 'К анимации →' : 'Добавить готовые клипы →'}</button></div>
           <TimedStoryboard key={`${job.id}-${job.revision}`} job={job} projectId={projectId} versionId={versionId} disabled={!!busy || dirty} onBusy={setStoryboardBusy} onCreated={value => { putJob(value); setConfirmed(false); }} />
+          <FrameImageImport key={job.id} job={job} projectId={projectId} versionId={versionId} disabled={!!busy || dirty} onBusy={markTransferBusy} onJob={putJob} onRefresh={refresh} />
         </>}
         {job && <ol className="video-shot-list">{job.shots.map((shot, index) => <li className="video-shot" key={shot.id}>
           <div className="video-shot-image">{usesClip(shot) ? <video style={{ width: '100%', height: '100%', objectFit: 'contain' }} controls muted preload="metadata" src={assetURL(shot.clip!.file)} aria-label={`Клип сцены ${index + 1}`} /> : shot.image.file ? <Image unoptimized width={1280} height={720} src={assetURL(shot.image.file)} alt={`Изображение кадра ${index + 1}`} /> : <span>КАДР {String(index + 1).padStart(2, '0')}<small>{shot.image.state === 'pending' ? 'Обрабатывается сервисом' : shot.image.state === 'unknown' ? 'Результат запроса неизвестен' : 'Изображение ещё не создано'}</small></span>}</div>
           <div className="video-shot-copy"><p className="video-shot-label">Кадр {index + 1} · {usesClip(shot) ? 'MP4-клип' : 'Изображение'}</p><p>{shot.text}</p><p className="video-muted">{timingLabel(shot)}</p><details><summary>Описание изображения</summary><label className="sr-only" htmlFor={`prompt-${shot.id}`}>Описание кадра {index + 1}</label><textarea id={`prompt-${shot.id}`} rows={4} maxLength={productionLimits.prompt} value={drafts[shot.id] ?? shot.prompt} disabled={!!busy} onChange={e => { if (!dirty) setDraftRevision(job.revision); setDrafts(old => ({ ...old, [shot.id]: e.target.value })); }} /></details>
             {job.visualStyle && job.visualStyle !== 'original' && <details><summary>Запрос со стилем</summary><p className="video-muted">{imagePrompt(drafts[shot.id] ?? shot.prompt, job.visualStyle)}</p></details>}
-            {!usesClip(shot) && shot.image.file && <small className="video-muted">Источник: {imageCatalog[shot.image.provider || 'bfl-flux11'].label}{shot.image.generatedPrompt !== imagePrompt(shot.prompt, job.visualStyle) ? ' · описание или стиль изменены после генерации' : ''}</small>}
+            {shot.image.file && <small className="video-muted">Источник изображения: {shot.image.source === 'upload' ? 'загруженный файл · модель не подтверждена' : imageCatalog[shot.image.provider || 'bfl-flux11'].label}{shot.image.source !== 'upload' && shot.image.generatedPrompt !== imagePrompt(shot.prompt, job.visualStyle) ? ' · описание или стиль изменены после генерации' : ''}{usesClip(shot) ? ' · в монтаже выбран MP4-клип' : ''}</small>}
+            <button type="button" className="video-text-button" disabled={!!busy} onClick={async () => { try { await navigator.clipboard.writeText(framePromptForFlow(job, drafts[shot.id] ?? shot.prompt)); toast.success('Промпт изображения скопирован', { description: 'Вставьте его в Flow в режиме «Изображение». Для согласованности добавьте референс.' }); } catch { toast.error('Не удалось скопировать', { description: 'Раскройте описание кадра и скопируйте текст вручную.' }); } }}>Скопировать промпт для Flow</button>
             <button type="button" className="video-text-button" disabled={!!busy || dirty || !canImage || ['pending', 'requesting'].includes(shot.image.state)} onClick={() => operate('replace', shot.id)}>{shot.image.file || shot.image.state === 'unknown' || shot.image.state === 'failed' ? 'Новое изображение' : 'Создать этот кадр'} · ≈ {usd(imagePrice(job))}</button>
             {shot.image.state === 'unknown' && <small className="video-muted">Результат прошлого запроса неизвестен. Новое изображение — отдельный запрос с расходом квоты или денег; сначала проверьте историю исходного сервиса.</small>}
           </div>

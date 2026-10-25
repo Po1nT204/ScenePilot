@@ -8,6 +8,7 @@ export type Asset = {
   state: 'empty' | 'requesting' | 'pending' | 'ready' | 'unknown' | 'failed';
   file?: string; requestId?: string; pollingUrl?: string; generatedPrompt?: string; requestedPrompt?: string;
   provider?: ImageProviderId; requestedProvider?: ImageProviderId;
+  source?: 'upload';
 };
 export type ClipTail = 'hold' | 'loop' | 'auto';
 export type VideoShot = { id: string; text: string; start: number; end: number; prompt: string; image: Asset; sourceSceneId?: string; visual?: 'image' | 'clip'; clip?: { file: string; duration: number; source: 'upload'; tail: ClipTail } };
@@ -118,7 +119,7 @@ export function publicJob(job: VideoJob): VideoView {
   const { alignment: _alignment, ownerId: _owner, ...view } = job;
   void _alignment; void _owner;
   return { ...view, shotTimings: job.alignment ? shotTimings(job, job.alignment.character_end_times_seconds.at(-1)!) : undefined, audio: { state: job.audio.state, file: job.audio.file },
-    shots: job.shots.map(s => ({ ...s, image: { state: s.image.state, file: s.image.file, generatedPrompt: s.image.generatedPrompt, provider: s.image.provider, requestedProvider: s.image.requestedProvider } })) };
+    shots: job.shots.map(s => ({ ...s, image: { state: s.image.state, file: s.image.file, source: s.image.source, generatedPrompt: s.image.generatedPrompt, provider: s.image.provider, requestedProvider: s.image.requestedProvider } })) };
 }
 // Character boundaries come from the saved TTS alignment, not a words/minute guess.
 // The public view ends at the last spoken character; render includes the audio file's trailing silence.

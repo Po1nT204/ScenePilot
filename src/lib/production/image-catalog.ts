@@ -1,5 +1,8 @@
 // Shared UI metadata. IDs pin a provider/model pair; never repoint an existing ID.
 export const imageCatalog = {
+  'cloudflare-flux2-klein9b': { label: 'Cloudflare · FLUX.2 klein 9B', model: '@cf/black-forest-labs/flux-2-klein-9b', estimatedUSD: 0.015,
+    terms: '1280×720. Общая бесплатная квота Workers AI — 10 000 нейронов в день. Кадр до 1 Мп: около 1364 нейронов (≈ $0.015 сверх квоты на Paid). На Free превышение квоты останавливает запросы. Остаток и тариф проверяйте в Cloudflare.',
+    setup: 'Те же CLOUDFLARE_ACCOUNT_ID и CLOUDFLARE_API_TOKEN', url: 'https://developers.cloudflare.com/workers-ai/platform/pricing/' },
   'google-nano-banana-21': { label: 'Google · Nano Banana 2.1', model: 'gemini-nano-banana-2.1', estimatedUSD: 0.08,
     terms: 'Платный Gemini API, отдельно от Google Pro/Flow. 1K, 16:9. Оценка $0.08 за запрос; фактическая цена зависит от токенов. Бесплатного API-тарифа нет.',
     setup: 'GEMINI_API_KEY', url: 'https://aistudio.google.com/api-keys' },
@@ -11,6 +14,9 @@ export const imageCatalog = {
     setup: 'BFL_API_KEY', url: 'https://dashboard.bfl.ai' },
 } as const;
 export type ImageProviderId = keyof typeof imageCatalog;
+export function imageBillingLabel(id: ImageProviderId) {
+  return id === 'cloudflare-flux2-klein9b' ? 'бесплатная квота / платный перерасход' : imageCatalog[id].estimatedUSD === 0 ? 'бесплатная Beta' : 'платный API';
+}
 export type ImageSelection = ImageProviderId | 'none';
 export function isImageProvider(value: unknown): value is ImageProviderId {
   return typeof value === 'string' && Object.hasOwn(imageCatalog, value);

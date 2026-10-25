@@ -10,8 +10,8 @@
     "video:worker": "tsx scripts/video-worker.ts",
     "video:doctor": "tsx scripts/video-worker.ts --check",
     "lint": "eslint .",
-    "test": "tsx --test tests/project-validation.test.ts tests/script-validation.test.ts tests/test-generator.test.ts tests/scenes.test.ts tests/yandex.test.ts tests/export.test.ts tests/sql-files.test.ts tests/project-workspace.test.tsx tests/channel-ideas.test.ts tests/publication.test.ts tests/pilot.test.tsx tests/shots.test.ts tests/production.test.ts tests/video-worker.test.ts tests/runway-connect.test.ts tests/video-access.test.ts tests/library.test.tsx tests/storyboard.test.ts tests/google-images.test.ts tests/scene-workflow.test.ts tests/flow-batch.test.ts",
-    "video:test-render": "tsx --test tests/video-render.test.ts"
+    "test": "tsx --test tests/project-validation.test.ts tests/script-validation.test.ts tests/test-generator.test.ts tests/scenes.test.ts tests/yandex.test.ts tests/export.test.ts tests/sql-files.test.ts tests/project-workspace.test.tsx tests/channel-ideas.test.ts tests/publication.test.ts tests/pilot.test.tsx tests/shots.test.ts tests/production.test.ts tests/video-worker.test.ts tests/runway-connect.test.ts tests/video-access.test.ts tests/library.test.tsx tests/storyboard.test.ts tests/google-images.test.ts tests/scene-workflow.test.ts tests/flow-batch.test.ts tests/frame-quality.test.ts",
+    "video:test-render": "tsx --test tests/video-render.test.ts tests/image-import-render.test.ts"
   },
   "engines": {
     "node": ">=20.19.0"

@@ -1,4 +1,11 @@
 /* Shared workspace skin. Landing styles and production state remain independent. */
+.frame-import { margin-block: 24px; padding: 20px; border: 1px solid var(--line); border-radius: 12px; background: #fffefa; }
+.frame-import > summary { cursor: pointer; color: var(--green); font-weight: 600; }
+.frame-import > p { font-size: 14px; line-height: 1.7; }
+.frame-import label { display: block; margin-block: 10px; font-size: 14px; }
+.frame-import :is(select,input[type=file]) { width: 100%; min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); font: inherit; }
+.frame-file-preview { display: block; max-width: 100%; object-fit: contain; background: #e9ede2; border-radius: 6px; margin-bottom: 10px; }
+.frame-import .batch-replace { display: flex; gap: 10px; align-items: flex-start; }
 .flow-batch { border: 1px solid var(--line); border-radius: 12px; padding: 24px; margin-block: 24px; background: #fffefa; }
 .flow-batch-heading { display: flex; justify-content: space-between; flex-wrap: wrap; align-items: center; gap: 12px; }
 .flow-batch h4 { margin: 0; font-size: 20px; line-height: 1.4; }

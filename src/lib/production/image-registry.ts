@@ -7,6 +7,7 @@ import type { ImageAdapter } from './image-adapter';
 
 export function imageAdapter(id: ImageProviderId, config: ProviderConfig, transport: typeof fetch = fetch): ImageAdapter {
   const factories: Record<ImageProviderId, () => ImageAdapter> = {
+    'cloudflare-flux2-klein9b': () => cloudflareImages(config.cloudflareAccountId || '', config.cloudflareToken || '', transport, 'cloudflare-flux2-klein9b'),
     'google-nano-banana-21': () => googleImages(config.geminiKey || '', transport),
     'cloudflare-sdxl': () => cloudflareImages(config.cloudflareAccountId || '', config.cloudflareToken || '', transport),
     'bfl-flux11': () => ({

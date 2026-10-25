@@ -102,7 +102,7 @@ export function queueOperation(job: VideoJob, operation: VideoOperation, paidCon
   if (operation.kind === 'replace') {
     const shot = job.shots.find(s => s.id === operation.shotId)!;
     if (shot.image.pollingUrl || ['pending', 'requesting'].includes(shot.image.state)) throw new Error('Запрос этого кадра ещё не завершён. Сначала нажмите «Проверить задачи изображений»; новая генерация не запущена.');
-    shot.image = { state: 'empty', file: shot.image.file, generatedPrompt: shot.image.generatedPrompt, provider: shot.image.provider };
+    shot.image = { state: 'empty', file: shot.image.file, source: shot.image.source, generatedPrompt: shot.image.generatedPrompt, provider: shot.image.provider };
   }
   job.operation = { ...operation, reservedUSD: 0 }; job.status = 'queued'; job.message = 'В очереди локального обработчика.';
 }

@@ -11,14 +11,15 @@ export function suggestClipShot(name: string, job: Pick<VideoView, 'id' | 'shots
   const normalized = name.toLowerCase().replace(/ \(\d+\)(?=\.mp4$)/, '');
   return job.shots.find((_, index) => `${flowFrameName(job.id, index)}.mp4` === normalized)?.id ?? '';
 }
-export function clipFileProblem(file: Pick<File, 'name' | 'size'>) {
+export function clipFileProblem(file: Pick<File, 'name' | 'size'>): string {
   if (!/\.mp4$/i.test(file.name)) return 'Нужен MP4. Если скачали ZIP, сначала распакуйте его.';
   if (file.size < 12 || file.size > batchClipMaxBytes) return 'MP4 должен быть размером от 12 байт до 32 МиБ.';
   return '';
 }
-export type ClipAssignment = { key: string; file: File; shotId: string };
-export function assignmentProblems(rows: ClipAssignment[], job: Pick<VideoView, 'shots'>) {
-  return rows.map(row => clipFileProblem(row.file) ||
+export type FileAssignment = { key: string; file: File; shotId: string };
+export type ClipAssignment = FileAssignment;
+export function assignmentProblems(rows: FileAssignment[], job: Pick<VideoView, 'shots'>, validateFile = clipFileProblem) {
+  return rows.map(row => validateFile(row.file) ||
     (!job.shots.some(shot => shot.id === row.shotId) ? 'Выберите кадр.' : '') ||
     (rows.filter(other => other.shotId === row.shotId).length > 1 ? 'Этот кадр выбран для нескольких файлов.' : ''));
 }
@@ -40,13 +41,17 @@ export async function uploadVideoClip(projectId: string, versionId: string, job:
 }
 
 // A failed/uncertain write stops the batch. Completed items are never replayed.
-export async function importClipBatch(job: VideoView, rows: ClipAssignment[], options: {
-  upload: (current: VideoView, row: ClipAssignment) => Promise<VideoView>;
-  saved: (row: ClipAssignment, next: VideoView) => void;
-  started: (row: ClipAssignment) => void;
+type BatchOptions = {
+  upload: (current: VideoView, row: FileAssignment) => Promise<VideoView>;
+  saved: (row: FileAssignment, next: VideoView) => void;
+  started: (row: FileAssignment) => void;
   stop: () => boolean;
-}) {
-  if (!rows.length || rows.length > batchClipLimit || assignmentProblems(rows, job).some(Boolean)) throw new Error('Проверьте файлы и соответствие кадров.');
+};
+export function importClipBatch(job: VideoView, rows: ClipAssignment[], options: BatchOptions) {
+  return importFileBatch(job, rows, { ...options, validateFile: clipFileProblem });
+}
+export async function importFileBatch(job: VideoView, rows: FileAssignment[], options: BatchOptions & { validateFile: typeof clipFileProblem }) {
+  if (!rows.length || rows.length > batchClipLimit || assignmentProblems(rows, job, options.validateFile).some(Boolean)) throw new Error('Проверьте файлы и соответствие кадров.');
   let current = job, completed = 0;
   for (const row of rows) {
     if (options.stop()) return { completed, stopped: true };

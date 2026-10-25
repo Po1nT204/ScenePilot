@@ -62,7 +62,7 @@ export async function processJob(job: VideoJob, root: string, deps: ProductionSe
         const saveImage = async (result: ImageResult, provider: ImageProviderId) => {
           const file = `${randomUUID()}.${result.extension}`;
           await atomicWrite(join(jobDirectory(job.id, root), file), result.bytes);
-          Object.assign(shot.image, { file, state: 'ready', provider, pollingUrl: undefined, requestedProvider: undefined, generatedPrompt: shot.image.requestedPrompt || shot.prompt, requestedPrompt: undefined });
+          Object.assign(shot.image, { file, state: 'ready', provider, source: undefined, pollingUrl: undefined, requestedProvider: undefined, generatedPrompt: shot.image.requestedPrompt || shot.prompt, requestedPrompt: undefined });
           job.outputStale = !!job.output; await persist(); completed = true;
         };
         if (shot.image.state !== 'pending' && !shot.image.pollingUrl) {
