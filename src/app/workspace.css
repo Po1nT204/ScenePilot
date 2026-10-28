@@ -1,4 +1,18 @@
 /* Shared workspace skin. Landing styles and production state remain independent. */
+.video-frame-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; margin-block: 12px; }
+.video-frame-actions > .video-text-button { min-height: 44px; max-width: 100%; text-align: left; overflow-wrap: anywhere; }
+.video-frame-actions > .button { width: auto; min-width: 0; max-width: 100%; margin: 0; white-space: normal; }
+.frame-image-input { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 12px; }
+.frame-image-input > summary { min-height: 32px; }
+.frame-image-drop { display: grid; gap: 8px; padding: 18px 14px; border: 1px dashed #8d9d86; border-radius: 8px; background: #f3f5ed; cursor: pointer; }
+.frame-image-drop strong { font-size: 13px; font-weight: 500; }
+.frame-image-drop span { font-size: 11px; color: var(--muted); line-height: 1.6; }
+.frame-image-drop:focus-visible { outline: 3px solid #b35a28; outline-offset: 3px; }
+.frame-image-drop[aria-disabled=true] { opacity: .6; cursor: default; }
+.frame-image-file { display: grid; gap: 8px; margin-block: 14px; font-size: 12px; }
+.frame-image-file input[type=file] { min-width: 0; max-width: 100%; font: inherit; }
+.frame-image-candidate { margin-top: 16px; }
+.frame-image-candidate .frame-file-preview { width: 100%; height: auto; max-height: 240px; aspect-ratio: 16/9; }
 .frame-import { margin-block: 24px; padding: 20px; border: 1px solid var(--line); border-radius: 12px; background: #fffefa; }
 .frame-import > summary { cursor: pointer; color: var(--green); font-weight: 600; }
 .frame-import > p { font-size: 14px; line-height: 1.7; }

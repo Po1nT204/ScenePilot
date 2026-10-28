@@ -6,6 +6,15 @@ export function imageFileProblem(file: Pick<File, 'name' | 'size'>) {
   if (!/\.(png|jpe?g|webp)$/i.test(file.name)) return 'Выберите PNG, JPEG или WebP. ZIP нужно сначала распаковать.';
   return file.size < 32 || file.size > 16 * 1024 * 1024 ? 'Изображение должно быть не больше 16 МиБ и не быть пустым.' : '';
 }
+// Paste reads only the file supplied by the user's paste event, never HTML/URLs or the clipboard in the background.
+export function frameImageFromTransfer(files: File[], fromClipboard = false) {
+  if (files.length !== 1) throw new Error(files.length ? 'Добавьте одно изображение в этот кадр. Несколько файлов можно загрузить через общий импорт.' : 'Изображение не получено. В Flow выберите «Копировать изображение», а не ссылку. Или выберите скачанный файл.');
+  const file = files[0], extensions: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
+  if ((file.type && !extensions[file.type]) || (fromClipboard && !extensions[file.type])) throw new Error('Поддерживаются изображения PNG, JPEG и WebP. Текст, ссылки и SVG не загружаются.');
+  const result = fromClipboard ? new File([file], `pasted-frame.${extensions[file.type]}`, { type: file.type }) : file;
+  const problem = imageFileProblem(result); if (problem) throw new Error(problem);
+  return result;
+}
 export function suggestImageShot(name: string, job: Pick<VideoView, 'id' | 'shots'>) {
   const stem = name.toLowerCase().replace(/(?: \(\d+\))?\.(png|jpe?g|webp)$/i, '');
   return job.shots.find((_, i) => flowFrameName(job.id, i).toLowerCase() === stem)?.id ?? '';

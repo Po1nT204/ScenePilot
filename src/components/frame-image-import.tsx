@@ -4,18 +4,7 @@ import { toast } from 'sonner';
 import type { VideoView } from '@/lib/production/model';
 import { assignmentProblems, importFileBatch, type FileAssignment } from '@/lib/production/flow-batch';
 import { imageFileProblem, suggestImageShot, uploadFrameImage } from '@/lib/production/frame-transfer';
-
-function FilePreview({ file }: { file: File }) {
-  const ref = useRef<HTMLImageElement>(null);
-  useEffect(() => {
-    const element = ref.current; if (!element || imageFileProblem(file)) return;
-    const url = URL.createObjectURL(file); element.src = url;
-    return () => { element.removeAttribute('src'); URL.revokeObjectURL(url); };
-  }, [file]);
-  // Local object URLs are previewed directly, never sent to the Next image optimizer.
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img ref={ref} width={160} height={90} className="frame-file-preview" alt={`Предпросмотр ${file.name}`} />;
-}
+import { FrameImagePreview } from './frame-image-preview';
 type Row = FileAssignment & { state: 'waiting' | 'uploading' | 'saved' | 'failed'; message?: string };
 export function FrameImageImport({ job, projectId, versionId, disabled, onBusy, onJob, onRefresh }: {
   job: VideoView; projectId: string; versionId: string; disabled: boolean;
@@ -62,7 +51,7 @@ export function FrameImageImport({ job, projectId, versionId, disabled, onBusy, 
       setRows(files.map((file, i) => ({ key: `${i}-${file.name}`, file, shotId: suggestImageShot(file.name, job), state: 'waiting' }))); setReplace(false); setMessage('Назначьте каждому изображению кадр. Порядок файлов не используется для сопоставления.');
     }} />
     {!!rows.length && <><ol className="batch-file-list">{rows.map((row, i) => <li className="batch-file-row" key={row.key}>
-      <div className="batch-file-info"><FilePreview file={row.file} /><strong>{row.file.name}</strong><small>{row.state === 'saved' ? 'Сохранён' : row.state === 'uploading' ? 'Загружается…' : row.state === 'failed' ? 'Не подтверждён' : 'Ожидает импорта'}</small></div>
+      <div className="batch-file-info"><FrameImagePreview file={row.file} /><strong>{row.file.name}</strong><small>{row.state === 'saved' ? 'Сохранён' : row.state === 'uploading' ? 'Загружается…' : row.state === 'failed' ? 'Не подтверждён' : 'Ожидает импорта'}</small></div>
       <div className="batch-file-target"><label htmlFor={`${id}-${i}`}>Кадр для изображения {i + 1}</label><select id={`${id}-${i}`} value={row.shotId} disabled={locked || review || row.state !== 'waiting'} aria-invalid={!!problems[i]} onChange={e => { setRows(old => old.map(item => item.key === row.key ? { ...item, shotId: e.target.value } : item)); setReplace(false); }}><option value="">Выберите кадр</option>{job.shots.map((shot, n) => <option key={shot.id} value={shot.id}>Кадр {n + 1}{shot.image.file ? ' · есть изображение' : ''} — {shot.text.slice(0, 70)}</option>)}</select><p className="video-muted">{job.shots.find(s => s.id === row.shotId)?.text.slice(0, 180)}</p>{(problems[i] || row.message) && <p className="field-error">{problems[i] || row.message}</p>}</div>
       {row.state === 'waiting' && <button type="button" className="video-text-button" disabled={locked || review} aria-label={`Убрать ${row.file.name}`} onClick={() => { setRows(old => old.filter(item => item.key !== row.key)); setReplace(false); }}>Убрать</button>}
     </li>)}</ol>

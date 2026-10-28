@@ -9,7 +9,7 @@ import { imageCatalog } from '../src/lib/production/image-catalog';
 import { imageAvailability } from '../src/lib/production/image-registry';
 import { ProviderError } from '../src/lib/production/providers';
 import { imageFileFormat, importImage } from '../src/lib/production/image-import';
-import { imageFileProblem, suggestImageShot, framePromptForFlow, uploadFrameImage } from '../src/lib/production/frame-transfer';
+import { imageFileProblem, suggestImageShot, framePromptForFlow, uploadFrameImage, frameImageFromTransfer } from '../src/lib/production/frame-transfer';
 import { flowFrameName, importFileBatch, assignmentProblems } from '../src/lib/production/flow-batch';
 import { createJob, editJob, jobDirectory, queueOperation, readJob, selectImageProvider } from '../src/lib/production/store';
 import { estimatedCost, publicJob, type VideoView } from '../src/lib/production/model';
@@ -26,6 +26,25 @@ async function fixture(run: (root: string) => Promise<void>) {
 }
 const input = { title: 'Fixture', script: 'The boat crosses the lake. Birds fly above the forest.', source: 'test', voiceId: 'fixture' };
 const scope = () => ({ ownerId: randomUUID(), projectId: randomUUID(), versionId: randomUUID() });
+
+test('a pasted raster keeps its bytes and MIME, gets a supported name, and rejects links or ambiguous selection', async () => {
+  for (const [type, suffix] of [['image/png', 'png'], ['image/jpeg', 'jpg'], ['image/webp', 'webp']]) {
+    const file = new File([png], '', { type });
+    const result = frameImageFromTransfer([file], true);
+    assert.equal(result.name, `pasted-frame.${suffix}`); assert.equal(result.type, type);
+    assert.deepEqual(Buffer.from(await result.arrayBuffer()), png);
+  }
+  assert.throws(() => frameImageFromTransfer([], true), /Копировать изображение/);
+  assert.throws(() => frameImageFromTransfer([makeFile(), makeFile()], true), /одно изображение/);
+  for (const type of ['text/html', 'text/uri-list', 'image/svg+xml', 'image/gif', '']) {
+    assert.throws(() => frameImageFromTransfer([new File([png], 'fake.png', { type })], true), /PNG, JPEG и WebP/);
+  }
+  assert.throws(() => frameImageFromTransfer([new File([], 'empty.png', { type: 'image/png' })], true), /пустым/);
+  assert.throws(() => frameImageFromTransfer([new File([new Uint8Array(16 * 1024 * 1024 + 1)], 'large.png', { type: 'image/png' })], true), /16 МиБ/);
+  const downloaded = makeFile('download.webp'); assert.equal(frameImageFromTransfer([downloaded]), downloaded);
+  assert.throws(() => frameImageFromTransfer([new File([png], 'renamed.png', { type: 'image/svg+xml' })]), /SVG/);
+  assert.throws(() => frameImageFromTransfer([makeFile('clip.mp4')]), /PNG, JPEG или WebP/);
+});
 
 test('FLUX on Cloudflare checks the pinned model without generation and submits native multipart once', async () => {
   const calls: string[] = [];
