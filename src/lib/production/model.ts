@@ -23,6 +23,7 @@ export type VideoJob = {
   message: string; shots: VideoShot[]; audio: Asset; alignment?: Alignment;
   imageProvider?: ImageSelection;
   visualStyle?: VisualStyle;
+  visualGuide?: string;
   subtitlesEnabled?: boolean;
   storyboardFrom?: { id: string; revision: number; target: number };
   planSource?: 'script' | 'scenes';

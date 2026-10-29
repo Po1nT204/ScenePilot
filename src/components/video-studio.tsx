@@ -9,6 +9,7 @@ import { FlowHandoff } from './flow-handoff';
 import { FlowBatch } from './flow-batch';
 import { FrameImageImport } from './frame-image-import';
 import { FrameImageInput } from './frame-image-input';
+import { FrameVisualGuide } from './frame-visual-guide';
 import { framePromptForFlow } from '@/lib/production/frame-transfer';
 import { clipFileProblem, uploadVideoClip } from '@/lib/production/flow-batch';
 import { type VideoView, type VideoSetup, type VideoOperation, type SpeechConnection, hasVisual, usesClip, estimatedCost, requiredProviders, createsMaterials, createsImages, neededImageProviders, productionRates, productionLimits, normalizeNarration } from '@/lib/production/model';
@@ -35,6 +36,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
   const [showConnections, setShowConnections] = useState(false);
   const [error, setError] = useState(''), [pending, startTransition] = useTransition();
   const [drafts, setDrafts] = useState<Record<string, string>>({}), [draftRevision, setDraftRevision] = useState<number>();
+  const [guideDraft, setGuideDraft] = useState<string>();
   const [budget, setBudget] = useState('1.00'), [confirmed, setConfirmed] = useState(false);
   const [connection, setConnection] = useState<SpeechConnection>();
   const [imageConnection, setImageConnection] = useState<ImageAccess>();
@@ -44,7 +46,8 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
   const providerInfo = provider === 'none' ? undefined : imageCatalog[provider];
   const imageConfigured = (id: ImageProviderId) => setup.imageProviders?.[id] ?? (id === 'bfl-flux11' && setup.images);
   const checkedImage = imageConnection?.provider === provider ? imageConnection : undefined;
-  const dirty = Object.keys(drafts).length > 0;
+  const guide = guideDraft ?? job?.visualGuide ?? '';
+  const dirty = Object.keys(drafts).length > 0 || guideDraft !== undefined;
   const busy = transferBusy || storyboardBusy || pending || job?.status === 'queued' || job?.status === 'running';
   const cost = job ? stage === 'speech' ? estimatedCost(job, 'speech') : Math.max(0, estimatedCost(job, 'generate') - estimatedCost(job, 'speech')) : 0;
   const progress = videoStageProgress(job);
@@ -114,7 +117,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
     if (dirty && !window.confirm('Описания кадров не сохранены. Открыть новую сборку?')) return;
     startTransition(async () => {
       setError('');
-      try { const result = await newVideo(projectId, versionId, voice, provider, planSource); if (result.error) setError(result.error); else { putJob(result.job!); setDrafts({}); setDraftRevision(undefined); goTo('speech'); toast.success('План кадров создан'); } }
+      try { const result = await newVideo(projectId, versionId, voice, provider, planSource); if (result.error) setError(result.error); else { putJob(result.job!); setDrafts({}); setGuideDraft(undefined); setDraftRevision(undefined); goTo('speech'); toast.success('План кадров создан'); } }
       catch { setError('Не удалось создать план. Попробуйте позже.'); }
     });
   }
@@ -132,8 +135,8 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
     startTransition(async () => {
       setError('');
       try {
-        const result = await saveVideoPrompts(projectId, versionId, job.id, draftRevision ?? job.revision, job.shots.map(s => ({ id: s.id, prompt: drafts[s.id] ?? s.prompt })));
-        if (result.error) setError(result.error); else { putJob(result.job!); setDrafts({}); setDraftRevision(undefined); toast.success('Описания сохранены'); }
+        const result = await saveVideoPrompts(projectId, versionId, job.id, draftRevision ?? job.revision, job.shots.map(s => ({ id: s.id, prompt: drafts[s.id] ?? s.prompt })), guide);
+        if (result.error) setError(result.error); else { putJob(result.job!); setDrafts({}); setGuideDraft(undefined); setDraftRevision(undefined); toast.success('Описания и общие детали сохранены'); }
       } catch { setError('Не удалось сохранить описания. Ваши правки остались на экране.'); }
     });
   }
@@ -276,13 +279,13 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
     {jobs.length > 0 && <details className="video-history"><summary>Сборки этой версии · {jobs.length}</summary>
         {jobs.length > 0 && <><label htmlFor="video-history">Сборки этой версии</label><select id="video-history" value={selected} disabled={!!busy} onChange={e => {
           if (dirty && !window.confirm('Описания не сохранены. Переключить сборку?')) return;
-          setSelected(e.target.value); setDrafts({}); setDraftRevision(undefined); setConfirmed(false); setStage(suggestedVideoStage(jobs.find(j => j.id === e.target.value)));
+          setSelected(e.target.value); setDrafts({}); setGuideDraft(undefined); setDraftRevision(undefined); setConfirmed(false); setStage(suggestedVideoStage(jobs.find(j => j.id === e.target.value)));
         }}>{jobs.map((j, i) => <option key={j.id} value={j.id}>{new Date(j.createdAt).toLocaleString('ru-RU')} · {statusLabel[j.status]} {i === 0 ? '· последняя' : ''}</option>)}</select></>}
     </details>}
     {job && <div className="video-status" role="status"><strong>{statusLabel[job.status]}</strong><p>{job.message}</p><button type="button" className="video-text-button" disabled={pending} onClick={() => void refresh()}>Обновить состояние</button></div>}
     {job && !setup.workerOnline && <p className="video-muted">Обработчик не запущен. Для генерации и монтажа запустите <code>npm run video:worker</code> в отдельном терминале. Если он закрывается — <code>npm run video:doctor</code>.</p>}
     {job && (stage === 'speech' || stage === 'frames') && (!setup.enabled || (stage === 'speech' ? !setup.speech : provider !== 'none' && !imageConfigured(provider))) && <p className="video-muted">Для запуска нужно настроить сервис. <button type="button" className="video-text-button" onClick={() => setShowConnections(true)}>Открыть настройки</button></p>}
-    {dirty && <div className="video-draft-bar" role="status"><span>Есть несохранённые описания кадров.</span><button type="button" className="video-text-button" onClick={save} disabled={!!busy}>Сохранить описания</button></div>}
+    {dirty && <div className="video-draft-bar" role="status"><span>Есть несохранённые описания или общие детали кадров.</span><button type="button" className="video-text-button" onClick={save} disabled={!!busy}>Сохранить описания</button></div>}
     <div className="video-studio-grid">
       <section id="video-stage-plan" aria-label="Сценарий" hidden={stage !== 'plan'} className="video-panel video-brief">
         <p className="eyebrow">01 / СЦЕНАРИЙ</p><h3>Основа ролика</h3>
@@ -321,6 +324,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
           <label htmlFor="video-visual-style">Общий стиль</label>
           <select id="video-visual-style" value={job.visualStyle ?? 'original'} disabled={!!busy || dirty} onChange={e => changeAppearance(e.target.value as VisualStyle, job.subtitlesEnabled ?? true)}>{Object.entries(visualStyles).map(([id, style]) => <option key={id} value={id}>{style.label}</option>)}</select>
           <p className="video-muted">Стиль применяется к новым изображениям. Готовые материалы сохраняются; одинаковые лица не гарантируются.</p>
+          <FrameVisualGuide value={guide} disabled={!!busy} dirty={dirty} onSave={save} onChange={value => { if (!dirty) setDraftRevision(job.revision); setGuideDraft(value); setConfirmed(false); }} promptLengths={job.shots.map(shot => imagePrompt(drafts[shot.id] ?? shot.prompt, job.visualStyle, guide).length)} />
           {!job.audio.file && <p>Сначала <button type="button" className="video-text-button" onClick={() => goTo('speech')}>создайте озвучку</button>, чтобы получить длительности кадров.</p>}
           {generationConsent}
           {needs.images && <button type="button" className="button" disabled={!!busy || dirty || !job.audio.file || !canGenerate || (createsMaterials(job, 'generate') && !confirmed)} onClick={() => operate('generate')}>Создать недостающие изображения · ≈ {usd(cost)}</button>}
@@ -334,10 +338,10 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
         {job && <ol className="video-shot-list">{job.shots.map((shot, index) => <li className="video-shot" key={shot.id}>
           <div className="video-shot-image">{shot.image.file ? <Image unoptimized width={1280} height={720} src={assetURL(shot.image.file)} alt={`Изображение кадра ${index + 1}`} /> : usesClip(shot) ? <video style={{ width: '100%', height: '100%', objectFit: 'contain' }} controls muted preload="metadata" src={assetURL(shot.clip!.file)} aria-label={`Клип сцены ${index + 1}`} /> : <span>КАДР {String(index + 1).padStart(2, '0')}<small>{shot.image.state === 'pending' ? 'Обрабатывается сервисом' : shot.image.state === 'unknown' ? 'Результат запроса неизвестен' : 'Изображение ещё не создано'}</small></span>}</div>
           <div className="video-shot-copy"><p className="video-shot-label">Кадр {index + 1} · {shot.image.file || !usesClip(shot) ? 'Изображение' : 'MP4-клип'}</p><p>{shot.text}</p><p className="video-muted">{timingLabel(shot)}</p><details><summary>Описание изображения</summary><label className="sr-only" htmlFor={`prompt-${shot.id}`}>Описание кадра {index + 1}</label><textarea id={`prompt-${shot.id}`} rows={4} maxLength={productionLimits.prompt} value={drafts[shot.id] ?? shot.prompt} disabled={!!busy} onChange={e => { if (!dirty) setDraftRevision(job.revision); setDrafts(old => ({ ...old, [shot.id]: e.target.value })); }} /></details>
-            {job.visualStyle && job.visualStyle !== 'original' && <details><summary>Запрос со стилем</summary><p className="video-muted">{imagePrompt(drafts[shot.id] ?? shot.prompt, job.visualStyle)}</p></details>}
-            {shot.image.file && <small className="video-muted">Источник изображения: {shot.image.source === 'upload' ? 'загруженный файл · модель не подтверждена' : imageCatalog[shot.image.provider || 'bfl-flux11'].label}{shot.image.source !== 'upload' && shot.image.generatedPrompt !== imagePrompt(shot.prompt, job.visualStyle) ? ' · описание или стиль изменены после генерации' : ''}{usesClip(shot) ? ' · в монтаже выбран MP4-клип' : ''}</small>}
+            <details><summary>Итоговый промпт</summary><p className="video-muted video-prompt-preview">{imagePrompt(drafts[shot.id] ?? shot.prompt, job.visualStyle, guide)}</p>{dirty && <small className="video-muted">Показан черновик. Сохраните описания перед генерацией по API.</small>}</details>
+            {shot.image.file && <small className="video-muted">Источник изображения: {shot.image.source === 'upload' ? 'загруженный файл · модель не подтверждена' : imageCatalog[shot.image.provider || 'bfl-flux11'].label}{shot.image.source !== 'upload' && shot.image.generatedPrompt !== imagePrompt(shot.prompt, job.visualStyle, job.visualGuide) ? ' · описание, стиль или общие детали изменены после генерации' : ''}{usesClip(shot) ? ' · в монтаже выбран MP4-клип' : ''}</small>}
             <div className="video-frame-actions" role="group" aria-label={`Действия кадра ${index + 1}`}>
-              <button type="button" className="video-text-button" disabled={!!busy} onClick={async () => { try { await navigator.clipboard.writeText(framePromptForFlow(job, drafts[shot.id] ?? shot.prompt)); toast.success('Промпт изображения скопирован', { description: 'Вставьте его в Flow в режиме «Изображение». Для согласованности добавьте референс.' }); } catch { toast.error('Не удалось скопировать', { description: 'Раскройте описание кадра и скопируйте текст вручную.' }); } }}>Скопировать промпт для Flow</button>
+              <button type="button" className="video-text-button" disabled={!!busy} onClick={async () => { try { await navigator.clipboard.writeText(framePromptForFlow({ ...job, visualGuide: guide }, drafts[shot.id] ?? shot.prompt)); toast.success(dirty ? 'Промпт скопирован из черновика' : 'Промпт изображения скопирован', { description: 'Вставьте его в Flow в режиме «Изображение». Для согласованности добавьте референс.' }); } catch { toast.error('Не удалось скопировать', { description: 'Раскройте итоговый промпт и скопируйте текст вручную.' }); } }}>Скопировать промпт для Flow</button>
               <button type="button" className="video-text-button" disabled={!!busy || dirty || !canImage || ['pending', 'requesting'].includes(shot.image.state)} onClick={() => operate('replace', shot.id)}>{shot.image.file || shot.image.state === 'unknown' || shot.image.state === 'failed' ? 'Новое изображение' : 'Создать этот кадр'} · ≈ {usd(imagePrice(job))}</button>
             </div>
             <FrameImageInput key={`${job.id}-${shot.id}`} job={job} shotId={shot.id} number={index + 1} projectId={projectId} versionId={versionId} disabled={!!busy || dirty} onBusy={markTransferBusy} onJob={putJob} onRefresh={refresh} />

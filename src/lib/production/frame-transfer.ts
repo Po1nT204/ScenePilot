@@ -19,8 +19,8 @@ export function suggestImageShot(name: string, job: Pick<VideoView, 'id' | 'shot
   const stem = name.toLowerCase().replace(/(?: \(\d+\))?\.(png|jpe?g|webp)$/i, '');
   return job.shots.find((_, i) => flowFrameName(job.id, i).toLowerCase() === stem)?.id ?? '';
 }
-export function framePromptForFlow(job: Pick<VideoView, 'visualStyle'>, prompt: string) {
-  return `${imagePrompt(prompt, job.visualStyle)}\nCreate one standalone 16:9 image, not a storyboard sheet or collage. Show one observable moment, with a clear subject, plausible anatomy and purposeful lighting. If reference images are supplied, preserve the recurring character's face, clothing and the established visual style.`;
+export function framePromptForFlow(job: Pick<VideoView, 'visualStyle' | 'visualGuide'>, prompt: string) {
+  return `${imagePrompt(prompt, job.visualStyle, job.visualGuide)}\nCreate one standalone 16:9 image, not a storyboard sheet or collage. Show one observable moment, with a clear subject, plausible anatomy and purposeful lighting. If reference images are supplied, preserve the recurring character's face, clothing and the established visual style.`;
 }
 export async function uploadFrameImage(projectId: string, versionId: string, job: VideoView, shotId: string, file: File) {
   const problem = imageFileProblem(file); if (problem) throw new Error(problem);

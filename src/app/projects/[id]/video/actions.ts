@@ -6,9 +6,8 @@ import { timedStoryboard } from '@/lib/production/timed-storyboard';
 import { readJob, assertScope } from '@/lib/production/store';
 import { videoContext } from '@/lib/production/context';
 import { selectVisual, fitAllClips } from '@/lib/production/clips';
-import { createJob, editJob, listJobs, workerOnline, queueOperation, selectImageProvider, saveAppearance } from '@/lib/production/store';
-import { imagePrompt } from '@/lib/production/visual-style';
-import { publicJob, createsMaterials, requiredProviders, neededImageProviders, productionLimits, type VideoOperation } from '@/lib/production/model';
+import { createJob, editJob, listJobs, workerOnline, queueOperation, selectImageProvider, saveAppearance, saveImageDescriptions } from '@/lib/production/store';
+import { publicJob, createsMaterials, requiredProviders, neededImageProviders, type VideoOperation } from '@/lib/production/model';
 import { providerConfig } from '@/lib/production/providers';
 import { checkSpeechConnection } from '@/lib/production/connection';
 import { imageAdapter, imageAvailability } from '@/lib/production/image-registry';
@@ -75,19 +74,10 @@ export async function saveVideoImageProvider(projectId: string, versionId: strin
     const { scope } = await videoContext(projectId, versionId); return { job: publicJob(await editJob(id, scope, revision, job => selectImageProvider(job, provider))) }; }
   catch (e) { return { error: message(e) }; }
 }
-export async function saveVideoPrompts(projectId: string, versionId: string, id: string, revision: number, prompts: { id: string; prompt: string }[]) {
+export async function saveVideoPrompts(projectId: string, versionId: string, id: string, revision: number, prompts: { id: string; prompt: string }[], visualGuide?: string) {
   try {
     const { scope } = await videoContext(projectId, versionId);
-    const job = await editJob(id, scope, revision, job => {
-      if (!Array.isArray(prompts) || prompts.length !== job.shots.length || new Set(prompts.map(p => p.id)).size !== prompts.length) throw new Error('Некорректный набор кадров.');
-      for (const shot of job.shots) {
-        const input = prompts.find(p => p.id === shot.id);
-        if (!input || typeof input.prompt !== 'string' || !input.prompt.trim() || input.prompt.length > productionLimits.prompt) throw new Error(`Описание кадра должно содержать от 1 до ${productionLimits.prompt} символов.`);
-        if (imagePrompt(input.prompt.trim(), job.visualStyle).length > productionLimits.prompt) throw new Error('Описание вместе с выбранным стилем превышает 2000 символов. Сократите описание.');
-        shot.prompt = input.prompt.trim();
-      }
-      job.message = 'Описания сохранены. Изображения не перегенерировались.';
-    });
+    const job = await editJob(id, scope, revision, job => saveImageDescriptions(job, prompts, visualGuide));
     return { job: publicJob(job) };
   } catch (e) { return { error: message(e) }; }
 }

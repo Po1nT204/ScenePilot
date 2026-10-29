@@ -11,7 +11,8 @@ import { ProviderError } from '../src/lib/production/providers';
 import { imageFileFormat, importImage } from '../src/lib/production/image-import';
 import { imageFileProblem, suggestImageShot, framePromptForFlow, uploadFrameImage, frameImageFromTransfer } from '../src/lib/production/frame-transfer';
 import { flowFrameName, importFileBatch, assignmentProblems } from '../src/lib/production/flow-batch';
-import { createJob, editJob, jobDirectory, queueOperation, readJob, selectImageProvider } from '../src/lib/production/store';
+import { createJob, editJob, jobDirectory, queueOperation, readJob, selectImageProvider, saveAppearance, saveImageDescriptions } from '../src/lib/production/store';
+import { imagePrompt, normalizeVisualGuide, visualGuideLimit } from '../src/lib/production/visual-style';
 import { estimatedCost, publicJob, type VideoView } from '../src/lib/production/model';
 import { processJob, type ProductionServices } from '../src/lib/production/processor';
 
@@ -26,6 +27,51 @@ async function fixture(run: (root: string) => Promise<void>) {
 }
 const input = { title: 'Fixture', script: 'The boat crosses the lake. Birds fly above the forest.', source: 'test', voiceId: 'fixture' };
 const scope = () => ({ ownerId: randomUUID(), projectId: randomUUID(), versionId: randomUUID() });
+
+test('shared visual notes keep legacy prompts intact and reach both API and Flow prompts', () => {
+  const scene = 'An empty railway platform.';
+  assert.equal(imagePrompt(scene), scene); assert.equal(imagePrompt(scene, 'original', ' \n '), scene);
+  assert.equal(normalizeVisualGuide('  Mara: green coat.\nBerlin: rainy morning.  '), 'Mara: green coat.\nBerlin: rainy morning.');
+  for (const bad of [null, {}, 5, 'x'.repeat(visualGuideLimit + 1)]) assert.throws(() => normalizeVisualGuide(bad), /800/);
+  const job = { visualStyle: 'photo' as const, visualGuide: 'Mara: green coat. Berlin: rainy morning.' };
+  const base = imagePrompt(scene, job.visualStyle, job.visualGuide), flow = framePromptForFlow(job, scene);
+  assert.match(base, /^Documentary photograph/); assert.ok(base.includes(scene)); assert.ok(base.includes(job.visualGuide));
+  assert.match(base, /only to characters and places present/); assert.match(base, /do not add absent characters/);
+  assert.ok(flow.startsWith(base + '\n')); assert.equal(flow.split(job.visualGuide).length - 1, 1);
+});
+
+test('shared notes save atomically with scene prompts, keep media and pending snapshots, and respect scope/revision', () => fixture(async root => {
+  const s = scope(); let job = await createJob(s, input, root);
+  job = await editJob(job.id, s, job.revision, value => {
+    value.audio = { state: 'ready', file: 'voice.mp3' }; value.output = 'existing.mp4'; value.outputStale = false;
+    value.shots[0].image = { state: 'pending', file: 'old.png', generatedPrompt: 'old appearance', requestedPrompt: 'pending appearance', pollingUrl: 'https://api.bfl.ai/fixture', requestedProvider: 'bfl-flux11' };
+    value.shots[0].clip = { file: 'clip.mp4', source: 'upload', duration: 8, tail: 'auto' }; value.shots[0].visual = 'clip';
+  }, root);
+  const before = structuredClone(job), prompts = job.shots.map(shot => ({ id: shot.id, prompt: 'Mara waits at the platform.' }));
+  for (const key of ['ownerId', 'projectId', 'versionId'] as const) await assert.rejects(editJob(job.id, { ...s, [key]: randomUUID() }, job.revision, value => saveImageDescriptions(value, prompts, 'Mara: green coat.'), root), /недоступно/);
+  await assert.rejects(editJob(job.id, s, job.revision - 1, value => saveImageDescriptions(value, prompts, 'Mara: green coat.'), root), /изменилось/);
+  job = await editJob(job.id, s, job.revision, value => saveImageDescriptions(value, prompts, '  Mara: green coat.  '), root);
+  assert.equal(job.visualGuide, 'Mara: green coat.'); assert.equal(publicJob(job).visualGuide, job.visualGuide);
+  assert.deepEqual(job.audio, before.audio); assert.deepEqual(job.shots[0].image, before.shots[0].image); assert.deepEqual(job.shots[0].clip, before.shots[0].clip);
+  assert.equal(job.shots[0].visual, 'clip'); assert.equal(job.output, before.output); assert.equal(job.outputStale, false); assert.deepEqual(job.attempts, before.attempts);
+  const saved = structuredClone(job);
+  for (const invalid of [null, [], [null], [{ ...prompts[0], id: 'foreign' }], prompts.map(p => ({ ...p, prompt: 'x'.repeat(1900) }))]) {
+    await assert.rejects(editJob(job.id, s, job.revision, value => saveImageDescriptions(value, invalid, 'Mara: green coat.'), root));
+    assert.deepEqual(await readJob(job.id, root), saved);
+  }
+  saveImageDescriptions(job, prompts); assert.equal(job.visualGuide, saved.visualGuide); // old callers preserve notes
+  saveImageDescriptions(job, prompts, ''); assert.equal(job.visualGuide, undefined);
+  job.status = 'running'; assert.throws(() => saveImageDescriptions(job, prompts, 'new notes'), /завершения/);
+}));
+
+test('combined prompt limits reject a style change without losing saved notes or partial updates', () => fixture(async root => {
+  const job = await createJob(scope(), input, root);
+  const prompts = job.shots.map(shot => ({ id: shot.id, prompt: 'x'.repeat(1750) }));
+  saveImageDescriptions(job, prompts, 'Mara: green coat.');
+  const snapshot = structuredClone(job);
+  assert.throws(() => saveAppearance(job, 'photo', false), /2000/); assert.deepEqual(job, snapshot);
+  assert.throws(() => saveImageDescriptions(job, prompts, 'x'.repeat(visualGuideLimit + 1)), /800/); assert.deepEqual(job, snapshot);
+}));
 
 test('a pasted raster keeps its bytes and MIME, gets a supported name, and rejects links or ambiguous selection', async () => {
   for (const [type, suffix] of [['image/png', 'png'], ['image/jpeg', 'jpg'], ['image/webp', 'webp']]) {
@@ -135,11 +181,26 @@ test('image import preserves speech, clips, prompts and original bytes and guard
 
 test('switching to FLUX preserves old files and requires budget; successful replacement records real provider', async () => fixture(async root => {
   const s=scope(); const job=await createJob(s,input,root);const shot=job.shots[0]; shot.image={state:'ready',file:'imported.png',source:'upload'};job.audio={state:'ready',file:'voice.mp3'};
+  saveImageDescriptions(job, job.shots.map(s => ({ id: s.id, prompt: s.prompt })), 'Mara: green coat.');
   selectImageProvider(job,provider);assert.equal(shot.image.source,'upload');assert.equal(estimatedCost(job,'replace',shot.id),0.015);
   assert.throws(()=>queueOperation(job,{kind:'replace',shotId:shot.id,budgetUSD:0,reservedUSD:0},true),/предел/);
   queueOperation(job,{kind:'replace',shotId:shot.id,budgetUSD:0.02,reservedUSD:0},true);assert.equal(shot.image.source,'upload');let calls=0;
-  const deps:ProductionServices={config:{enabled:true,elevenKey:'',bflKey:''},speech:async()=>{throw Error('no speech');},render:async()=>{throw Error('no render');},sleep:async()=>{},image:id=>({configured:true,checkConnection:async()=>{throw Error('no check');},poll:async()=>{throw Error('no poll');},submit:async()=>{
-    calls++;assert.equal(id,provider);const saved=await readJob(job.id,root);assert.equal(saved.attempts.at(-1)?.model,model);assert.equal(saved.attempts.at(-1)?.estimatedUSD,0.015);return {pending:false,bytes:png,extension:'png'};
+  const deps:ProductionServices={config:{enabled:true,elevenKey:'',bflKey:''},speech:async()=>{throw Error('no speech');},render:async()=>{throw Error('no render');},sleep:async()=>{},image:id=>({configured:true,checkConnection:async()=>{throw Error('no check');},poll:async()=>{throw Error('no poll');},submit:async prompt=>{
+    calls++;assert.equal(id,provider);const saved=await readJob(job.id,root);assert.equal(saved.attempts.at(-1)?.model,model);assert.equal(saved.attempts.at(-1)?.estimatedUSD,0.015);assert.equal(prompt, imagePrompt(shot.prompt, job.visualStyle, job.visualGuide));assert.equal(saved.shots[0].image.requestedPrompt, prompt);return {pending:false,bytes:png,extension:'png'};
   }})};
   await processJob(job,root,deps);assert.equal(calls,1);assert.equal(job.shots[0].image.source,undefined);assert.equal(job.shots[0].image.provider,provider);assert.equal(job.audio.file,'voice.mp3');
+  assert.equal(job.shots[0].image.generatedPrompt, imagePrompt(shot.prompt, job.visualStyle, job.visualGuide));
+}));
+
+test('finishing a pending image uses its original prompt after shared notes change, without a new submission', () => fixture(async root => {
+  const job = await createJob(scope(), input, root), shot = job.shots[0];
+  job.audio = { state: 'ready', file: 'voice.mp3' };
+  const requested = imagePrompt(shot.prompt, 'photo', 'Mara: red coat.');
+  shot.image = { state: 'pending', requestedPrompt: requested, requestedProvider: 'bfl-flux11', requestId: 'fixture', pollingUrl: 'https://api.bfl.ai/fixture' };
+  saveImageDescriptions(job, job.shots.map(s => ({ id: s.id, prompt: s.prompt })), 'Mara: green coat.');
+  queueOperation(job, { kind: 'check', budgetUSD: 0, reservedUSD: 0 }, false);
+  let polls = 0;
+  const deps: ProductionServices = { config: { enabled: false, elevenKey: '', bflKey: '' }, speech: async () => { throw Error('no speech'); }, render: async () => { throw Error('no render'); }, sleep: async () => {}, image: id => ({ configured: true, checkConnection: async () => { throw Error('no check'); }, submit: async () => { throw Error('no submission'); }, poll: async () => { assert.equal(id, 'bfl-flux11'); polls++; return { pending: false, bytes: png, extension: 'png' }; } }) };
+  await processJob(job, root, deps);
+  assert.equal(polls, 1); assert.equal(shot.image.generatedPrompt, requested); assert.equal(job.visualGuide, 'Mara: green coat.'); assert.deepEqual(job.attempts, []);
 }));

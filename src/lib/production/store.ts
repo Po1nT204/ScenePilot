@@ -6,7 +6,7 @@ import { type VideoJob, type VideoScope, type VideoOperation, validVoice, assets
 import { type ImageSelection, validImageSelection, selectedImageProvider } from './image-catalog';
 import { initialStoryboard } from './initial-storyboard';
 import type { SceneEdit } from '../scene-editing';
-import { imagePrompt, validVisualStyle } from './visual-style';
+import { imagePrompt, normalizeVisualGuide, validVisualStyle } from './visual-style';
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function validJobId(id: string) { return uuid.test(id); }
@@ -115,10 +115,29 @@ export function selectImageProvider(job: VideoJob, selection: unknown) {
 export function saveAppearance(job: VideoJob, style: unknown, subtitles: unknown) {
   if (!validVisualStyle(style) || typeof subtitles !== 'boolean') throw new Error('Некорректные настройки оформления.');
   if (job.status === 'queued' || job.status === 'running') throw new Error('Дождитесь завершения текущего действия.');
-  if (job.shots.some(shot => imagePrompt(shot.prompt, style).length > 2000)) throw new Error('Описание со стилем превышает 2000 символов. Сократите длинные описания кадров.');
+  if (job.shots.some(shot => imagePrompt(shot.prompt, style, job.visualGuide).length > 2000)) throw new Error('Описание со стилем и общими деталями превышает 2000 символов. Сократите длинные описания кадров или общие детали.');
   if ((job.subtitlesEnabled ?? true) !== subtitles && job.output) job.outputStale = true;
   job.visualStyle = style; job.subtitlesEnabled = subtitles;
   job.message = 'Оформление сохранено. Субтитры изменятся при пересборке, стиль — при отдельной генерации изображения. Готовые материалы сохранены.';
+}
+export function saveImageDescriptions(job: VideoJob, prompts: unknown, visualGuide: unknown = job.visualGuide ?? '') {
+  if (job.status === 'queued' || job.status === 'running') throw new Error('Дождитесь завершения текущего действия.');
+  const guide = normalizeVisualGuide(visualGuide);
+  if (!Array.isArray(prompts) || prompts.length !== job.shots.length) throw new Error('Некорректный набор кадров.');
+  const descriptions = new Map<string, string>();
+  for (const input of prompts) {
+    if (!input || typeof input.id !== 'string' || typeof input.prompt !== 'string' || !input.prompt.trim() || input.prompt.length > 2000 || descriptions.has(input.id)) throw new Error('Каждому кадру нужно одно описание от 1 до 2000 символов.');
+    descriptions.set(input.id, input.prompt.trim());
+  }
+  for (const [index, shot] of job.shots.entries()) {
+    const prompt = descriptions.get(shot.id);
+    if (!prompt) throw new Error('Некорректный набор кадров.');
+    if (imagePrompt(prompt, job.visualStyle, guide).length > 2000) throw new Error(`Кадр ${index + 1}: описание со стилем и общими деталями превышает 2000 символов. Сократите описание или общие детали.`);
+  }
+  // Validate the entire update before mutating; existing files and pending request snapshots stay intact.
+  for (const shot of job.shots) shot.prompt = descriptions.get(shot.id)!;
+  job.visualGuide = guide || undefined;
+  job.message = 'Описания и общие детали сохранены. Готовые материалы не менялись; генерация не запускалась.';
 }
 export async function workerOnline(root = productionRoot()) {
   try { return Date.now() - (await stat(join(root, 'heartbeat'))).mtimeMs < 15000; } catch { return false; }

@@ -71,8 +71,8 @@ export async function processJob(job: VideoJob, root: string, deps: ProductionSe
           const provider = selectedImageProvider(job);
           if (provider === 'none') throw new Error('Выберите модуль изображений перед генерацией.');
           job.message = `${imageCatalog[provider].label}: кадр ${job.shots.indexOf(shot) + 1} из ${job.shots.length}`;
-          const prompt = imagePrompt(shot.prompt, job.visualStyle);
-          if (prompt.length > 2000) throw new Error('Описание со стилем превышает 2000 символов. Сократите описание кадра.');
+          const prompt = imagePrompt(shot.prompt, job.visualStyle, job.visualGuide);
+          if (prompt.length > 2000) throw new Error('Описание со стилем и общими деталями превышает 2000 символов. Сократите описание кадра или общие детали.');
           shot.image.requestedPrompt = prompt;
           shot.image.requestedProvider = provider;
           await reserve('image', shot.image, shot.id, provider);
