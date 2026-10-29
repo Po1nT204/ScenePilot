@@ -24,6 +24,7 @@ export type VideoJob = {
   imageProvider?: ImageSelection;
   visualStyle?: VisualStyle;
   visualGuide?: string;
+  chapter?: { number: number; total: number; start: number; end: number; sourceCharacters: number };
   subtitlesEnabled?: boolean;
   storyboardFrom?: { id: string; revision: number; target: number };
   planSource?: 'script' | 'scenes';

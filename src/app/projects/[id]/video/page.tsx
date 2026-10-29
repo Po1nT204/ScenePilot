@@ -13,6 +13,6 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
   const state = await videoState(id, versionId);
   return <><ProjectWorkspace projectId={id} title={project.title} current="video" version={version} />
     {'error' in state ? <p role="alert">{state.error}</p> : <VideoStudio projectId={id} versionId={versionId} script={version.content} scriptSource={version.source || 'unknown'}
-      initialJobs={state.jobs!} initialSetup={state.setup!} defaultVoice={process.env.ELEVENLABS_VOICE_ID || 'JBFqnCBsd6RMkjVDRZzb'} />}
+      initialJobs={state.jobs!} initialSetup={state.setup!} planningPace={version.settings_snapshot?.narration_pace} defaultVoice={process.env.ELEVENLABS_VOICE_ID || 'JBFqnCBsd6RMkjVDRZzb'} />}
   </>;
 }

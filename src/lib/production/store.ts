@@ -7,6 +7,7 @@ import { type ImageSelection, validImageSelection, selectedImageProvider } from 
 import { initialStoryboard } from './initial-storyboard';
 import type { SceneEdit } from '../scene-editing';
 import { imagePrompt, normalizeVisualGuide, validVisualStyle } from './visual-style';
+import { selectedScriptChapter } from './chapters';
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function validJobId(id: string) { return uuid.test(id); }
@@ -70,12 +71,16 @@ export async function listJobs(scope?: VideoScope, root = productionRoot()) {
   }
   return jobs.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
-export async function createJob(scope: VideoScope, input: { title: string; script: string; source: string; voiceId: string; imageProvider?: ImageSelection; pace?: number; scenes?: SceneEdit[] }, root = productionRoot()) {
+export async function createJob(scope: VideoScope, input: { title: string; script: string; source: string; voiceId: string; imageProvider?: ImageSelection; pace?: number; scenes?: SceneEdit[]; chapterIndex?: number }, root = productionRoot()) {
   if (![scope.ownerId, scope.projectId, scope.versionId].every(validJobId) || !validVoice(input.voiceId)) throw new Error('Укажите корректный Voice ID ElevenLabs.');
   if (!validImageSelection(input.imageProvider ?? 'none')) throw new Error('Неизвестный модуль изображений.');
-  const plan = initialStoryboard(input.script, input.pace, input.scenes);
-  const { pace: _pace, scenes, ...base } = input; void _pace;
-  const job: VideoJob = { schema: 1, id: randomUUID(), ...scope, ...base, planSource:scenes ? 'scenes' : 'script', sceneSnapshot:scenes ? structuredClone(scenes) : undefined, versionScript:scenes ? input.script : undefined, imageProvider: input.imageProvider ?? 'none', text: plan.text,
+  if (input.chapterIndex !== undefined && input.scenes !== undefined) throw new Error('Разбиение на части доступно для сценария. Готовые сцены этим действием не переносятся.');
+  const part = input.chapterIndex === undefined ? undefined : selectedScriptChapter(input.script, input.pace, input.chapterIndex);
+  const script = part?.chapter.text ?? input.script;
+  const plan = initialStoryboard(script, input.pace, input.scenes);
+  const { pace: _pace, scenes, chapterIndex: _chapterIndex, ...base } = input; void _pace; void _chapterIndex;
+  const chapter = part ? { number: part.chapter.number, total: part.total, start: part.chapter.start, end: part.chapter.end, sourceCharacters: part.sourceCharacters } : undefined;
+  const job: VideoJob = { schema: 1, id: randomUUID(), ...scope, ...base, script, title: part ? `${input.title} · Часть ${part.chapter.number} из ${part.total}` : input.title, chapter, planSource:scenes ? 'scenes' : 'script', sceneSnapshot:scenes ? structuredClone(scenes) : undefined, versionScript:scenes || part ? input.script : undefined, imageProvider: input.imageProvider ?? 'none', text: plan.text,
     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), revision: 0, status: 'draft', message: 'План сохранён. Проверьте описание каждого кадра.',
     shots: plan.shots.map(s => ({ ...s, id: randomUUID() })), audio: { state: 'empty' }, outputStale: false, attempts: [] };
   await mkdir(jobDirectory(job.id, root), { recursive: true }); await saveJob(job, root); return job;

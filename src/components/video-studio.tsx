@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Image from 'next/image';
 import { toast } from 'sonner';
 import { videoStages, suggestedVideoStage, videoStageProgress, type VideoStage } from '@/lib/production/workflow';
@@ -12,7 +12,9 @@ import { FrameImageInput } from './frame-image-input';
 import { FrameVisualGuide } from './frame-visual-guide';
 import { framePromptForFlow } from '@/lib/production/frame-transfer';
 import { clipFileProblem, uploadVideoClip } from '@/lib/production/flow-batch';
-import { type VideoView, type VideoSetup, type VideoOperation, type SpeechConnection, hasVisual, usesClip, estimatedCost, requiredProviders, createsMaterials, createsImages, neededImageProviders, productionRates, productionLimits, normalizeNarration } from '@/lib/production/model';
+import { type VideoView, type VideoSetup, type VideoOperation, type SpeechConnection, hasVisual, usesClip, estimatedCost, requiredProviders, createsMaterials, createsImages, neededImageProviders, productionRates, productionLimits } from '@/lib/production/model';
+import { planScriptChapters } from '@/lib/production/chapters';
+import { formatDuration, narrationPace } from '@/lib/narration';
 import { newVideo, saveVideoPrompts, startVideoOperation, videoState, checkVideoSpeechConnection, checkVideoImageConnection, saveVideoImageProvider, saveVideoAppearance, saveVideoVisual, fitVideoClips } from '@/app/projects/[id]/video/actions';
 import { visualStyles, imagePrompt, type VisualStyle } from '@/lib/production/visual-style';
 
@@ -22,8 +24,8 @@ import type { ImageAccess } from '@/lib/production/image-adapter';
 
 const statusLabel: Record<VideoView['status'], string> = { draft: 'План кадров', queued: 'В очереди', running: 'В работе', materials: 'Материалы готовы', ready: 'Видео готово', failed: 'Нужно внимание' };
 const usd = (value: number) => '$' + value.toFixed(3).replace(/0$/, '');
-export function VideoStudio({ projectId, versionId, script, scriptSource = 'unknown', initialJobs, initialSetup, defaultVoice }: {
-  projectId: string; versionId: string; script: string; scriptSource?: string; initialJobs: VideoView[]; initialSetup: VideoSetup; defaultVoice: string;
+export function VideoStudio({ projectId, versionId, script, scriptSource = 'unknown', initialJobs, initialSetup, defaultVoice, planningPace = narrationPace.default }: {
+  projectId: string; versionId: string; script: string; scriptSource?: string; initialJobs: VideoView[]; initialSetup: VideoSetup; defaultVoice: string; planningPace?: number;
 }) {
   const [jobs, setJobs] = useState(initialJobs), [selected, setSelected] = useState(initialJobs[0]?.id || '');
   const [setup, setSetup] = useState(initialSetup), [voice, setVoice] = useState(defaultVoice);
@@ -33,6 +35,13 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
   const transferBusyRef = useRef(false), refreshEpoch = useRef(0);
   const markTransferBusy = (value: boolean) => { transferBusyRef.current = value; refreshEpoch.current++; setTransferBusy(value); };
   const [planSource, setPlanSource] = useState<'script' | 'scenes'>('script');
+  const [chapterIndex, setChapterIndex] = useState(0);
+  const chapterPlan = useMemo(() => {
+    try { return { chapters: planScriptChapters(script, planningPace), error: '' }; }
+    catch (error) { return { chapters: [], error: error instanceof Error ? error.message : 'Не удалось подготовить части сценария.' }; }
+  }, [script, planningPace]);
+  const multipart = planSource === 'script' && chapterPlan.chapters.length > 1;
+  const chosenChapter = chapterPlan.chapters[chapterIndex];
   const [showConnections, setShowConnections] = useState(false);
   const [error, setError] = useState(''), [pending, startTransition] = useTransition();
   const [drafts, setDrafts] = useState<Record<string, string>>({}), [draftRevision, setDraftRevision] = useState<number>();
@@ -114,10 +123,11 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
     window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
   function create() {
+    if (planSource === 'script' && (chapterPlan.error || !chosenChapter)) { setError(chapterPlan.error || 'Выберите часть сценария.'); return; }
     if (dirty && !window.confirm('Описания кадров не сохранены. Открыть новую сборку?')) return;
     startTransition(async () => {
       setError('');
-      try { const result = await newVideo(projectId, versionId, voice, provider, planSource); if (result.error) setError(result.error); else { putJob(result.job!); setDrafts({}); setGuideDraft(undefined); setDraftRevision(undefined); goTo('speech'); toast.success('План кадров создан'); } }
+      try { const result = await newVideo(projectId, versionId, voice, provider, planSource, multipart ? chapterIndex : undefined); if (result.error) setError(result.error); else { putJob(result.job!); setDrafts({}); setGuideDraft(undefined); setDraftRevision(undefined); goTo('speech'); toast.success(result.job?.chapter ? `План части ${result.job.chapter.number} создан` : 'План кадров создан'); } }
       catch { setError('Не удалось создать план. Попробуйте позже.'); }
     });
   }
@@ -280,9 +290,10 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
         {jobs.length > 0 && <><label htmlFor="video-history">Сборки этой версии</label><select id="video-history" value={selected} disabled={!!busy} onChange={e => {
           if (dirty && !window.confirm('Описания не сохранены. Переключить сборку?')) return;
           setSelected(e.target.value); setDrafts({}); setGuideDraft(undefined); setDraftRevision(undefined); setConfirmed(false); setStage(suggestedVideoStage(jobs.find(j => j.id === e.target.value)));
-        }}>{jobs.map((j, i) => <option key={j.id} value={j.id}>{new Date(j.createdAt).toLocaleString('ru-RU')} · {statusLabel[j.status]} {i === 0 ? '· последняя' : ''}</option>)}</select></>}
+        }}>{jobs.map((j, i) => <option key={j.id} value={j.id}>{j.chapter ? `Часть ${j.chapter.number}/${j.chapter.total} · ` : ''}{new Date(j.createdAt).toLocaleString('ru-RU')} · {statusLabel[j.status]} {i === 0 ? '· последняя' : ''}</option>)}</select></>}
     </details>}
     {job && <div className="video-status" role="status"><strong>{statusLabel[job.status]}</strong><p>{job.message}</p><button type="button" className="video-text-button" disabled={pending} onClick={() => void refresh()}>Обновить состояние</button></div>}
+    {job?.chapter && <p className="video-part-notice"><strong>Часть {job.chapter.number} из {job.chapter.total}.</strong> Эта сборка создаёт отдельный MP4 только для выбранной части. Автоматическое объединение частей пока не подключено.</p>}
     {job && !setup.workerOnline && <p className="video-muted">Обработчик не запущен. Для генерации и монтажа запустите <code>npm run video:worker</code> в отдельном терминале. Если он закрывается — <code>npm run video:doctor</code>.</p>}
     {job && (stage === 'speech' || stage === 'frames') && (!setup.enabled || (stage === 'speech' ? !setup.speech : provider !== 'none' && !imageConfigured(provider))) && <p className="video-muted">Для запуска нужно настроить сервис. <button type="button" className="video-text-button" onClick={() => setShowConnections(true)}>Открыть настройки</button></p>}
     {dirty && <div className="video-draft-bar" role="status"><span>Есть несохранённые описания или общие детали кадров.</span><button type="button" className="video-text-button" onClick={save} disabled={!!busy}>Сохранить описания</button></div>}
@@ -295,10 +306,16 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
         <details open={!job || undefined} className="video-new-plan"><summary>{job ? 'Другая основа или голос · новая сборка' : 'Настройки плана'}</summary>
         <label htmlFor="video-plan-source">Основа новой сборки</label><select id="video-plan-source" value={planSource} disabled={!!busy} onChange={e => setPlanSource(e.target.value as 'script' | 'scenes')}><option value="script">Сохранённый сценарий</option><option value="scenes">Сохранённые сцены: их озвучка и промпты</option></select>
         <p className="video-muted">{planSource === 'scenes' ? 'Одна сохранённая сцена — один кадр с её полным текстом и промптом. 12 сцен дадут 12 кадров. Длинный кадр можно оживить локальным движением картинки или автоподгонкой клипа. Это не создаёт новых действий персонажа.' : 'Текст делится примерно по 8 секунд с учётом темпа чтения. Это черновые места для изображений, а не продуманная режиссура. Если сцены уже готовы, выберите их источником, чтобы сохранить ваши визуальные описания.'} Дополнительное дробление доступно отдельно после озвучки. Старые сборки не изменяются; новая сборка не переносит их материалы.</p>
+        {multipart && <div className="video-chapters">
+          <h4>Части длинного сценария</h4><p>Получилось частей: {chapterPlan.chapters.length}. Это разбиение по объёму и границам предложений, не редактура сюжета. Исходная версия остаётся целой.</p>
+          <label htmlFor="video-chapter">Какую часть подготовить</label><select id="video-chapter" value={chapterIndex} disabled={!!busy} onChange={event => setChapterIndex(Number(event.target.value))}>{chapterPlan.chapters.map((part, index) => <option key={part.number} value={index}>Часть {part.number} · ≈ {formatDuration(part.estimatedSeconds)} · {part.text.length} символов</option>)}</select>
+          {chosenChapter && <><p className="video-muted">{chosenChapter.words} слов · длительность оценена при {planningPace} слов/мин. Точное время появится после озвучки.</p><details><summary>Текст выбранной части</summary><p className="video-script">{chosenChapter.text}</p></details></>}
+          <p className="video-muted">Создаётся только выбранная часть. У каждой будет своя озвучка, кадры и MP4; объединение в один выпуск — следующий этап. Сохранённые сцены и материалы других сборок сюда не переносятся.</p>
+        </div>}
         <label htmlFor="video-voice">Voice ID ElevenLabs</label><input id="video-voice" value={voice} onChange={e => setVoice(e.target.value)} maxLength={100} disabled={!!busy} />
         <p className="video-muted">Для новой сборки. {job ? `Текущая сборка использует голос ${job.voiceId}. Для смены голоса создайте новую сборку.` : 'В ElevenLabs откройте My Voices → меню голоса → Copy voice ID.'}</p>
-        <button type="button" className="button" disabled={!!busy || !voice.trim() || (planSource === 'script' && normalizeNarration(script).length > productionLimits.characters)} onClick={create}>{job ? 'Создать отдельную сборку' : 'Подготовить план и перейти к озвучке'} <span aria-hidden="true">→</span></button>
-        {planSource === 'script' && normalizeNarration(script).length > productionLimits.characters && <p role="alert">Первый вариант производства рассчитан на сценарий до {productionLimits.characters} символов. Сохраните короткую версию для проверки.</p>}
+        <button type="button" className="button" disabled={!!busy || !voice.trim() || (planSource === 'script' && (!!chapterPlan.error || !chosenChapter))} onClick={create}>{multipart ? `Подготовить часть ${chapterIndex + 1} из ${chapterPlan.chapters.length}` : job ? 'Создать отдельную сборку' : 'Подготовить план и перейти к озвучке'} <span aria-hidden="true">→</span></button>
+        {planSource === 'script' && chapterPlan.error && <p role="alert">{chapterPlan.error}</p>}
         <p className="video-muted">Подготовка плана бесплатна. Голос и изображения создаются на следующих этапах после вашего подтверждения.</p>
         </details>
       </section>

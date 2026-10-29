@@ -12,6 +12,7 @@ import { providerConfig } from '@/lib/production/providers';
 import { checkSpeechConnection } from '@/lib/production/connection';
 import { imageAdapter, imageAvailability } from '@/lib/production/image-registry';
 import { isImageProvider, validImageSelection, imageCatalog, type ImageSelection } from '@/lib/production/image-catalog';
+import { visibleVideoJobs } from '@/lib/production/chapters';
 
 function message(error: unknown) {
   unstable_rethrow(error);
@@ -37,7 +38,7 @@ export async function videoState(projectId: string, versionId: string) {
     const { scope } = await videoContext(projectId, versionId);
     const config = providerConfig();
     const imageProviders = imageAvailability(config);
-    return { jobs: (await listJobs(scope)).slice(0, 20).map(publicJob), setup: { enabled: config.enabled, speech: !!config.elevenKey, images: Object.values(imageProviders).some(Boolean), imageProviders, workerOnline: await workerOnline() } };
+    return { jobs: visibleVideoJobs(await listJobs(scope)).map(publicJob), setup: { enabled: config.enabled, speech: !!config.elevenKey, images: Object.values(imageProviders).some(Boolean), imageProviders, workerOnline: await workerOnline() } };
   } catch (e) { return { error: message(e) }; }
 }
 export async function checkVideoSpeechConnection(projectId: string, versionId: string, voiceId: string) {
@@ -53,11 +54,12 @@ export async function checkVideoImageConnection(projectId: string, versionId: st
     return { connection: await imageAdapter(provider, providerConfig()).checkConnection() };
   } catch (e) { return { error: message(e) }; }
 }
-export async function newVideo(projectId: string, versionId: string, voiceId: string, imageProvider: ImageSelection = 'none', planSource: 'script' | 'scenes' = 'script') {
+export async function newVideo(projectId: string, versionId: string, voiceId: string, imageProvider: ImageSelection = 'none', planSource: 'script' | 'scenes' = 'script', chapterIndex?: number) {
   try {
     const { scope, project, version, supabase } = await videoContext(projectId, versionId);
     if (!validImageSelection(imageProvider)) throw new Error('Неизвестный модуль изображений.');
     if (!['script','scenes'].includes(planSource)) throw new Error('Выберите источник плана.');
+    if (planSource === 'scenes' && chapterIndex !== undefined) throw new Error('Для частей выберите источником сохранённый сценарий.');
     let scenes;
     if (planSource === 'scenes') {
       const saved = await supabase.from('scenes').select('id,description,visual_prompt,narration,source').eq('script_version_id',versionId).order('position');
@@ -65,7 +67,7 @@ export async function newVideo(projectId: string, versionId: string, voiceId: st
       scenes = stableSceneEditsPayload(saved.data);
       if (!scenes?.length) throw new Error('Сначала сохраните сцены или выберите источником сценарий.');
     }
-    const job = await createJob(scope, { title: project.title, script: version.content, source: scenes ? (new Set(scenes.map(s=>s.source)).size === 1 ? scenes[0].source : 'mixed') : version.source || 'unknown', scenes, pace:version.settings_snapshot?.narration_pace, voiceId: typeof voiceId === 'string' ? voiceId.trim() : '', imageProvider });
+    const job = await createJob(scope, { title: project.title, script: version.content, source: scenes ? (new Set(scenes.map(s=>s.source)).size === 1 ? scenes[0].source : 'mixed') : version.source || 'unknown', scenes, pace:version.settings_snapshot?.narration_pace, voiceId: typeof voiceId === 'string' ? voiceId.trim() : '', imageProvider, chapterIndex });
     return { job: publicJob(job) };
   } catch (e) { return { error: message(e) }; }
 }
