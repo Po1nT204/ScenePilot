@@ -5,6 +5,8 @@ import { productionRoot, withLock, listJobs, readJob, saveJob, jobDirectory } fr
 import { processJob, recoverJob, services } from '../src/lib/production/processor';
 import { providerConfig } from '../src/lib/production/providers';
 import { workerFailure, type WorkerPhase } from '../src/lib/production/worker-diagnostics';
+import { listReleases, readRelease, releaseDirectory, saveRelease } from '../src/lib/production/release-store';
+import { processRelease, recoverRelease } from '../src/lib/production/release-render';
 
 loadEnvConfig(process.cwd());
 const root = productionRoot();
@@ -19,8 +21,9 @@ async function main() {
   await withLock(join(root, 'worker.lock'), async () => {
     phase = 'read';
     const jobs = await listJobs(undefined, root);
+    const releases = await listReleases(undefined, root);
     if (checkOnly) {
-      console.log(`Проверка пройдена: папка доступна, блокировка получена, сборок прочитано: ${jobs.length}. Генерация и восстановление задач не запускались.`);
+      console.log(`Проверка пройдена: папка доступна, блокировка получена, сборок прочитано: ${jobs.length}, выпусков: ${releases.length}. Генерация и восстановление задач не запускались.`);
       return;
     }
     phase = 'heartbeat';
@@ -32,6 +35,7 @@ async function main() {
       for (const job of jobs) {
         if (recoverJob(job)) await saveJob(job, root);
       }
+      for (const release of releases) if (recoverRelease(release)) await saveRelease(release, root);
       while (!stopping) {
         phase = 'read';
         for (const candidate of (await listJobs(undefined, root)).reverse()) {
@@ -39,6 +43,14 @@ async function main() {
           phase = 'process';
           await withLock(join(jobDirectory(candidate.id, root), 'edit.lock'), async () => {
             await processJob(await readJob(candidate.id, root), root, services(providerConfig()));
+          });
+        }
+        phase = 'read';
+        for (const release of (await listReleases(undefined, root)).reverse()) {
+          if (stopping || release.status !== 'queued') continue;
+          phase = 'process';
+          await withLock(join(releaseDirectory(release.id, root), 'edit.lock'), async () => {
+            await processRelease(await readRelease(release.id, root), root);
           });
         }
         await new Promise(r => setTimeout(r, 1500));

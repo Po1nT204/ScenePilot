@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, readFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { createJob, saveJob, readJob } from '../src/lib/production/store';
 import { workerFailure } from '../src/lib/production/worker-diagnostics';
+import { readRelease, releaseDirectory, saveRelease } from '../src/lib/production/release-store';
+import type { VideoRelease } from '../src/lib/production/release-model';
 
 async function doctor(root: string) {
   const child = spawn(process.execPath, ['--import', 'tsx', 'scripts/video-worker.ts', '--check'], { cwd: process.cwd(), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
@@ -54,6 +56,10 @@ test('worker starts with its real CLI and recovers interrupted tasks without gen
   const root = await mkdtemp(join(tmpdir(), 'scenepilot-worker-'));
   const job = await createJob({ ownerId: randomUUID(), projectId: randomUUID(), versionId: randomUUID() }, { title: 'Recovery', script: 'Test.', source: 'test', voiceId: 'fixture' }, root);
   job.status = 'running'; job.audio.state = 'requesting'; await saveJob(job, root);
+  const release: VideoRelease = { schema: 1, id: randomUUID(), ownerId: job.ownerId, projectId: job.projectId, versionId: job.versionId,
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), status: 'running', message: 'Interrupted fixture',
+    inputs: [1, 2].map(number => ({ jobId: randomUUID(), revision: 1, output: `${randomUUID()}.mp4`, number })) };
+  await mkdir(releaseDirectory(release.id, root), { recursive: true }); await saveRelease(release, root);
   const child = spawn(process.execPath, ['--import', 'tsx', 'scripts/video-worker.ts'], { cwd: process.cwd(), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, SCENEPILOT_MEDIA_DIR: root, VIDEO_GENERATION_ENABLED: 'false', ELEVENLABS_API_KEY: '', BFL_API_KEY: '' } });
   const exited = new Promise<void>(resolve => child.once('close', () => resolve()));
@@ -65,12 +71,14 @@ test('worker starts with its real CLI and recovers interrupted tasks without gen
     let recovered = false;
     for (let i = 0; i < 100; i++) {
       await new Promise(resolve => setTimeout(resolve, 100));
-      if ((await readJob(job.id, root)).status === 'failed') { recovered = true; break; }
+      if ((await readJob(job.id, root)).status === 'failed' && (await readRelease(release.id, root)).status === 'failed') { recovered = true; break; }
       if (child.exitCode !== null) break;
     }
     assert.ok(startup.includes('Обработчик видео запущен'), 'CLI must start');
     assert.ok(recovered, 'interrupted job must be recovered');
     const saved = await readJob(job.id, root);
     assert.equal(saved.audio.state, 'unknown'); assert.equal(saved.attempts.length, 0);
+    const savedRelease = await readRelease(release.id, root);
+    assert.equal(savedRelease.status, 'failed'); assert.equal(savedRelease.output, undefined); assert.match(savedRelease.message, /вручную/);
   } finally { child.kill(); await exited; await rm(root, { recursive: true, force: true }); }
 });

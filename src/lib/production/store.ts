@@ -54,7 +54,7 @@ export async function readJob(id: string, root = productionRoot()): Promise<Vide
   if (job.schema !== 1 || job.id !== id || !validJobId(job.ownerId) || !validJobId(job.projectId) || !validJobId(job.versionId)) throw new Error('Файл задачи повреждён.');
   return job;
 }
-export function assertScope(job: VideoJob, scope: VideoScope) {
+export function assertScope(job: VideoScope, scope: VideoScope) {
   if (job.ownerId !== scope.ownerId || job.projectId !== scope.projectId || job.versionId !== scope.versionId) throw new Error('Видео не найдено или недоступно.');
 }
 export async function saveJob(job: VideoJob, root = productionRoot()) {

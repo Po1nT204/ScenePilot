@@ -226,3 +226,16 @@
   .app-footer { font-size: 10px; gap: 16px; line-height: 1.6; }
   .auth-shell .auth-card { padding: 24px; }
 }
+.video-release { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
+.video-release-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
+.video-release-heading h3 { margin: .25rem 0; }
+.video-release-heading > span { font-size: .85rem; white-space: nowrap; }
+.video-release-parts { list-style: none; padding: 0; margin: 1rem 0; display: grid; gap: .85rem; }
+.video-release-parts li { display: grid; grid-template-columns: 5rem minmax(0, 1fr); align-items: start; gap: .75rem; }
+.video-release-parts li > label { padding-top: .65rem; }
+.video-release-parts li p { margin: .6rem 0; font-size: .9rem; }
+.video-release-parts select { width: 100%; min-width: 0; text-overflow: ellipsis; }
+.video-release-parts small { display: block; margin-top: .3rem; font-size: .8rem; }
+.video-release-output { margin-top: 1.5rem; }
+.video-release-output video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #141918; border-radius: .75rem; margin: .75rem 0 1rem; }
+@media (max-width: 540px) { .video-release-parts li { grid-template-columns: minmax(0, 1fr); gap: .25rem; } .video-release-parts li > label { padding: 0; } }

@@ -13,6 +13,8 @@ import { checkSpeechConnection } from '@/lib/production/connection';
 import { imageAdapter, imageAvailability } from '@/lib/production/image-registry';
 import { isImageProvider, validImageSelection, imageCatalog, type ImageSelection } from '@/lib/production/image-catalog';
 import { visibleVideoJobs } from '@/lib/production/chapters';
+import { listReleases, queueRelease } from '@/lib/production/release-store';
+import { publicRelease, releaseParts } from '@/lib/production/release-model';
 
 function message(error: unknown) {
   unstable_rethrow(error);
@@ -35,10 +37,22 @@ export async function createVideoStoryboard(projectId: string, versionId: string
 }
 export async function videoState(projectId: string, versionId: string) {
   try {
-    const { scope } = await videoContext(projectId, versionId);
+    const { scope, version } = await videoContext(projectId, versionId);
     const config = providerConfig();
     const imageProviders = imageAvailability(config);
-    return { jobs: visibleVideoJobs(await listJobs(scope)).map(publicJob), setup: { enabled: config.enabled, speech: !!config.elevenKey, images: Object.values(imageProviders).some(Boolean), imageProviders, workerOnline: await workerOnline() } };
+    const [jobs, releases] = await Promise.all([listJobs(scope), listReleases(scope)]);
+    const lastReady = releases.find(release => release.status === 'ready');
+    return { jobs: visibleVideoJobs(jobs).map(publicJob), parts: releaseParts(jobs, version.content, version.settings_snapshot?.narration_pace),
+      releases: releases.filter((release, index) => index < 10 || release.id === lastReady?.id).map(release => publicRelease(release, jobs)),
+      setup: { enabled: config.enabled, speech: !!config.elevenKey, images: Object.values(imageProviders).some(Boolean), imageProviders, workerOnline: await workerOnline() } };
+  } catch (e) { return { error: message(e) }; }
+}
+export async function assembleVideoRelease(projectId: string, versionId: string, selection: { id: string; revision: number }[]) {
+  try {
+    const { scope, version } = await videoContext(projectId, versionId);
+    if (!(await workerOnline())) throw new Error('Запустите обработчик командой npm run video:worker в отдельном терминале.');
+    const release = await queueRelease(scope, version.content, version.settings_snapshot?.narration_pace, selection);
+    return { release: publicRelease(release, await listJobs(scope)) };
   } catch (e) { return { error: message(e) }; }
 }
 export async function checkVideoSpeechConnection(projectId: string, versionId: string, voiceId: string) {
