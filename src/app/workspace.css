@@ -239,3 +239,10 @@
 .video-release-output { margin-top: 1.5rem; }
 .video-release-output video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #141918; border-radius: .75rem; margin: .75rem 0 1rem; }
 @media (max-width: 540px) { .video-release-parts li { grid-template-columns: minmax(0, 1fr); gap: .25rem; } .video-release-parts li > label { padding: 0; } }
+.video-settings-transfer { margin-block: 20px; padding-block: 14px; border-block: 1px solid var(--line); }
+.video-settings-list { display: grid; gap: 8px; margin: 14px 0; font-size: 13px; }
+.video-settings-list > div { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 12px; }
+.video-settings-list dt { color: var(--muted); }
+.video-settings-list dd { margin: 0; overflow-wrap: anywhere; }
+.video-settings-transfer > details { margin-block: 12px; font-size: 13px; }
+.video-settings-transfer summary { cursor: pointer; color: var(--green); }

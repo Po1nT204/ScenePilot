@@ -68,7 +68,7 @@ export async function checkVideoImageConnection(projectId: string, versionId: st
     return { connection: await imageAdapter(provider, providerConfig()).checkConnection() };
   } catch (e) { return { error: message(e) }; }
 }
-export async function newVideo(projectId: string, versionId: string, voiceId: string, imageProvider: ImageSelection = 'none', planSource: 'script' | 'scenes' = 'script', chapterIndex?: number) {
+export async function newVideo(projectId: string, versionId: string, voiceId: string, imageProvider: ImageSelection = 'none', planSource: 'script' | 'scenes' = 'script', chapterIndex?: number, settingsFrom?: { id: string; revision: number }) {
   try {
     const { scope, project, version, supabase } = await videoContext(projectId, versionId);
     if (!validImageSelection(imageProvider)) throw new Error('Неизвестный модуль изображений.');
@@ -81,7 +81,7 @@ export async function newVideo(projectId: string, versionId: string, voiceId: st
       scenes = stableSceneEditsPayload(saved.data);
       if (!scenes?.length) throw new Error('Сначала сохраните сцены или выберите источником сценарий.');
     }
-    const job = await createJob(scope, { title: project.title, script: version.content, source: scenes ? (new Set(scenes.map(s=>s.source)).size === 1 ? scenes[0].source : 'mixed') : version.source || 'unknown', scenes, pace:version.settings_snapshot?.narration_pace, voiceId: typeof voiceId === 'string' ? voiceId.trim() : '', imageProvider, chapterIndex });
+    const job = await createJob(scope, { title: project.title, script: version.content, source: scenes ? (new Set(scenes.map(s=>s.source)).size === 1 ? scenes[0].source : 'mixed') : version.source || 'unknown', scenes, pace:version.settings_snapshot?.narration_pace, voiceId: typeof voiceId === 'string' ? voiceId.trim() : '', imageProvider, chapterIndex, settingsFrom });
     return { job: publicJob(job) };
   } catch (e) { return { error: message(e) }; }
 }

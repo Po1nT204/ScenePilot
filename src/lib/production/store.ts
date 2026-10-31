@@ -8,6 +8,7 @@ import { initialStoryboard } from './initial-storyboard';
 import type { SceneEdit } from '../scene-editing';
 import { imagePrompt, normalizeVisualGuide, validVisualStyle } from './visual-style';
 import { selectedScriptChapter } from './chapters';
+import { productionSettings, type ProductionSettings } from './settings';
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function validJobId(id: string) { return uuid.test(id); }
@@ -71,18 +72,37 @@ export async function listJobs(scope?: VideoScope, root = productionRoot()) {
   }
   return jobs.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
-export async function createJob(scope: VideoScope, input: { title: string; script: string; source: string; voiceId: string; imageProvider?: ImageSelection; pace?: number; scenes?: SceneEdit[]; chapterIndex?: number }, root = productionRoot()) {
+type NewVideoInput = { title: string; script: string; source: string; voiceId: string; imageProvider?: ImageSelection; pace?: number; scenes?: SceneEdit[]; chapterIndex?: number; settingsFrom?: { id: string; revision: number } };
+export async function createJob(scope: VideoScope, input: NewVideoInput, root = productionRoot()) {
+  if (input.settingsFrom === undefined) return createJobWithSettings(scope, input, root);
+  const reference = input.settingsFrom;
+  if (!reference || !validJobId(reference.id) || !Number.isSafeInteger(reference.revision) || reference.revision < 1) throw new Error('Выберите исходную сборку для переноса настроек.');
+  // Reject missing/foreign sources before withLock can create a directory.
+  assertScope(await readJob(reference.id, root), scope);
+  return withLock(join(jobDirectory(reference.id, root), 'edit.lock'), async () => {
+    const source = await readJob(reference.id, root); assertScope(source, scope);
+    if (source.revision !== reference.revision) throw new Error('Исходная сборка изменилась. Обновите состояние перед переносом настроек.');
+    if (source.status === 'queued' || source.status === 'running') throw new Error('Дождитесь завершения текущего действия перед переносом настроек.');
+    const settings = productionSettings(source);
+    return createJobWithSettings(scope, { ...input, voiceId: settings.voiceId, imageProvider: settings.imageProvider, settingsFrom: { id: source.id, revision: source.revision } }, root, settings);
+  });
+}
+async function createJobWithSettings(scope: VideoScope, input: NewVideoInput, root: string, settings?: ProductionSettings) {
   if (![scope.ownerId, scope.projectId, scope.versionId].every(validJobId) || !validVoice(input.voiceId)) throw new Error('Укажите корректный Voice ID ElevenLabs.');
   if (!validImageSelection(input.imageProvider ?? 'none')) throw new Error('Неизвестный модуль изображений.');
   if (input.chapterIndex !== undefined && input.scenes !== undefined) throw new Error('Разбиение на части доступно для сценария. Готовые сцены этим действием не переносятся.');
   const part = input.chapterIndex === undefined ? undefined : selectedScriptChapter(input.script, input.pace, input.chapterIndex);
   const script = part?.chapter.text ?? input.script;
   const plan = initialStoryboard(script, input.pace, input.scenes);
+  if (settings) for (const [index, shot] of plan.shots.entries()) {
+    if (imagePrompt(shot.prompt, settings.visualStyle, settings.visualGuide).length > 2000) throw new Error(`Кадр ${index + 1}: описание с перенесёнными настройками превышает 2000 символов. Сократите описание сцены или создайте план без переноса настроек.`);
+  }
   const { pace: _pace, scenes, chapterIndex: _chapterIndex, ...base } = input; void _pace; void _chapterIndex;
   const chapter = part ? { number: part.chapter.number, total: part.total, start: part.chapter.start, end: part.chapter.end, sourceCharacters: part.sourceCharacters } : undefined;
-  const job: VideoJob = { schema: 1, id: randomUUID(), ...scope, ...base, script, title: part ? `${input.title} · Часть ${part.chapter.number} из ${part.total}` : input.title, chapter, planSource:scenes ? 'scenes' : 'script', sceneSnapshot:scenes ? structuredClone(scenes) : undefined, versionScript:scenes || part ? input.script : undefined, imageProvider: input.imageProvider ?? 'none', text: plan.text,
+  const job: VideoJob = { schema: 1, id: randomUUID(), ...scope, ...base, script, title: part ? `${input.title} · Часть ${part.chapter.number} из ${part.total}` : input.title, chapter, planSource:scenes ? 'scenes' : 'script', sceneSnapshot:scenes ? structuredClone(scenes) : undefined, versionScript:scenes || part ? input.script : undefined, imageProvider: input.imageProvider ?? 'none', ...settings, text: plan.text,
     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), revision: 0, status: 'draft', message: 'План сохранён. Проверьте описание каждого кадра.',
     shots: plan.shots.map(s => ({ ...s, id: randomUUID() })), audio: { state: 'empty' }, outputStale: false, attempts: [] };
+  if (settings) job.message = 'План создан с настройками выбранной сборки. Проверьте новые кадры; генерация ещё не запускалась.';
   await mkdir(jobDirectory(job.id, root), { recursive: true }); await saveJob(job, root); return job;
 }
 export async function editJob(id: string, scope: VideoScope, revision: number, edit: (job: VideoJob) => void | Promise<void>, root = productionRoot()) {

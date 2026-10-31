@@ -11,6 +11,7 @@ import { FrameImageImport } from './frame-image-import';
 import { FrameImageInput } from './frame-image-input';
 import { FrameVisualGuide } from './frame-visual-guide';
 import { VideoReleasePanel } from './video-release';
+import { VideoSettingsTransfer } from './video-settings-transfer';
 import type { ReleasePart, ReleaseView } from '@/lib/production/release-model';
 import { framePromptForFlow } from '@/lib/production/frame-transfer';
 import { clipFileProblem, uploadVideoClip } from '@/lib/production/flow-batch';
@@ -38,6 +39,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
   const transferBusyRef = useRef(false), refreshEpoch = useRef(0);
   const markTransferBusy = (value: boolean) => { transferBusyRef.current = value; refreshEpoch.current++; setTransferBusy(value); };
   const [planSource, setPlanSource] = useState<'script' | 'scenes'>('script');
+  const [inheritSettings, setInheritSettings] = useState(true);
   const [chapterIndex, setChapterIndex] = useState(0);
   const chapterPlan = useMemo(() => {
     try { return { chapters: planScriptChapters(script, planningPace), error: '' }; }
@@ -54,6 +56,7 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
   const [imageConnection, setImageConnection] = useState<ImageAccess>();
   const [newImageProvider, setNewImageProvider] = useState<ImageSelection>('none');
   const job = jobs.find(j => j.id === selected);
+  const copyingSettings = !!job && inheritSettings;
   const provider = job ? selectedImageProvider(job) : newImageProvider;
   const providerInfo = provider === 'none' ? undefined : imageCatalog[provider];
   const imageConfigured = (id: ImageProviderId) => setup.imageProviders?.[id] ?? (id === 'bfl-flux11' && setup.images);
@@ -153,11 +156,12 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
   }
   function create() {
     if (planSource === 'script' && (chapterPlan.error || !chosenChapter)) { setError(chapterPlan.error || 'Выберите часть сценария.'); return; }
+    if (copyingSettings && dirty) { setError('Сначала сохраните описания и общие детали кадров.'); return; }
     if (dirty && !window.confirm('Описания кадров не сохранены. Открыть новую сборку?')) return;
     startTransition(async () => {
       setError('');
-      try { const result = await newVideo(projectId, versionId, voice, provider, planSource, multipart ? chapterIndex : undefined); if (result.error) setError(result.error); else { putJob(result.job!); setDrafts({}); setGuideDraft(undefined); setDraftRevision(undefined); goTo('speech'); toast.success(result.job?.chapter ? `План части ${result.job.chapter.number} создан` : 'План кадров создан'); } }
-      catch { setError('Не удалось создать план. Попробуйте позже.'); }
+      try { const result = await newVideo(projectId, versionId, copyingSettings ? job!.voiceId : voice, copyingSettings ? provider : newImageProvider, planSource, multipart ? chapterIndex : undefined, copyingSettings ? { id: job!.id, revision: job!.revision } : undefined); if (result.error) setError(result.error); else { putJob(result.job!); setDrafts({}); setGuideDraft(undefined); setDraftRevision(undefined); goTo('speech'); toast.success(result.job?.chapter ? `План части ${result.job.chapter.number} создан` : 'План кадров создан'); } }
+      catch { setError('Ответ не получен. Обновите состояние и проверьте историю сборок перед повтором: план мог сохраниться.'); }
     });
   }
   function checkConnection() {
@@ -341,9 +345,17 @@ export function VideoStudio({ projectId, versionId, script, scriptSource = 'unkn
           {chosenChapter && <><p className="video-muted">{chosenChapter.words} слов · длительность оценена при {planningPace} слов/мин. Точное время появится после озвучки.</p><details><summary>Текст выбранной части</summary><p className="video-script">{chosenChapter.text}</p></details></>}
           <p className="video-muted">Создаётся только выбранная часть. У каждой будет своя озвучка, кадры и MP4; готовые части можно объединить на этапе «Сборка». Сохранённые сцены и материалы других сборок сюда не переносятся.</p>
         </div>}
-        <label htmlFor="video-voice">Voice ID ElevenLabs</label><input id="video-voice" value={voice} onChange={e => setVoice(e.target.value)} maxLength={100} disabled={!!busy} />
-        <p className="video-muted">Для новой сборки. {job ? `Текущая сборка использует голос ${job.voiceId}. Для смены голоса создайте новую сборку.` : 'В ElevenLabs откройте My Voices → меню голоса → Copy voice ID.'}</p>
-        <button type="button" className="button" disabled={!!busy || !voice.trim() || (planSource === 'script' && (!!chapterPlan.error || !chosenChapter))} onClick={create}>{multipart ? `Подготовить часть ${chapterIndex + 1} из ${chapterPlan.chapters.length}` : job ? 'Создать отдельную сборку' : 'Подготовить план и перейти к озвучке'} <span aria-hidden="true">→</span></button>
+        {job && <VideoSettingsTransfer job={job} checked={inheritSettings} disabled={!!busy} dirty={dirty} onChange={setInheritSettings} />}
+        {!copyingSettings && <>
+          <label htmlFor="video-voice">Voice ID ElevenLabs</label><input id="video-voice" value={voice} onChange={e => setVoice(e.target.value)} maxLength={100} disabled={!!busy} />
+          <p className="video-muted">Для новой сборки. В ElevenLabs: My Voices → меню голоса → Copy voice ID.</p>
+          <label htmlFor="video-new-image-provider">Изображения новой сборки</label><select id="video-new-image-provider" value={newImageProvider} disabled={!!busy} onChange={event => setNewImageProvider(event.target.value as ImageSelection)}>
+            <option value="none">Ручной перенос из Flow или другого сервиса</option>
+            {Object.entries(imageCatalog).map(([id, info]) => <option key={id} value={id}>{info.label}</option>)}
+          </select>
+          <p className="video-muted">Стиль и общие детали можно задать на этапе «Кадры», субтитры — на этапе «Сборка». Выбор сервиса не запускает генерацию.</p>
+        </>}
+        <button type="button" className="button" disabled={!!busy || (copyingSettings ? dirty : !voice.trim()) || (planSource === 'script' && (!!chapterPlan.error || !chosenChapter))} onClick={create}>{multipart ? `Подготовить часть ${chapterIndex + 1} из ${chapterPlan.chapters.length}` : job ? 'Создать отдельную сборку' : 'Подготовить план и перейти к озвучке'} <span aria-hidden="true">→</span></button>
         {planSource === 'script' && chapterPlan.error && <p role="alert">{chapterPlan.error}</p>}
         <p className="video-muted">Подготовка плана бесплатна. Голос и изображения создаются на следующих этапах после вашего подтверждения.</p>
         </details>
